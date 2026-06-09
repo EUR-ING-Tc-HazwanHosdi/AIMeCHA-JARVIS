@@ -32,7 +32,7 @@ st.markdown("""
 # ==========================================
 # HEADER WITH A.I.M.E.C.H.A. LOGO
 # ==========================================
-header_col1, header_col2 = st.columns([50, 40])
+header_col1, header_col2 = st.columns([200, 200])
 
 with header_col1:
     # Using the exact filename from your repository screenshot
