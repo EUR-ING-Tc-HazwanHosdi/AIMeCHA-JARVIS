@@ -141,7 +141,6 @@ def render_system_logo(filename: str):
         with col1:
             st.image(filename, width=380)
     else:
-        # Fallback styling matching the interface look if the image is missing locally
         st.markdown("""
             <div style="border: 1px solid rgba(0, 229, 255, 0.3); background: rgba(5,20,35,0.6); 
                         padding: 15px; border-radius: 8px; display: inline-block; margin-bottom: 20px;">
@@ -150,7 +149,6 @@ def render_system_logo(filename: str):
             </div>
         """, unsafe_allow_html=True)
 
-# Execute asset layout placement
 render_system_logo(LOGO_FILENAME)
 
 st.title("🤖 A.I.M.E.C.H.A. J.A.R.V.I.S. Core Operating System")
@@ -171,18 +169,15 @@ client = genai.Client(api_key=api_key)
 # FEATURE 3: LOCAL TOOLS / FILE GENERATOR
 # ==========================================
 def create_local_file(file_name: str, content: str) -> str:
-    """
-    Generates and saves any kind of file needed (CSV, Python scripts, Excel, CAD templates, markdown documentation).
-    """
+    """Generates and saves any kind of file needed."""
     try:
         safe_path = os.path.basename(file_name)
         with open(safe_path, "w", encoding="utf-8") as f:
             f.write(content)
-        return f"SUCCESS: File '{safe_path}' successfully generated and archived in temporary environment."
+        return f"SUCCESS: File '{safe_path}' successfully generated and archived."
     except Exception as e:
         return f"ERROR: Failed to initialize file sequence due to: {str(e)}"
 
-# Register the tool block inside Gemini's signature schema
 tools_list = [create_local_file]
 
 # ==========================================
@@ -192,30 +187,9 @@ JARVIS_MASTER_PROMPT = """
 You are A.I.M.E.C.H.A. J.A.R.V.I.S., a sophisticated, hyper-intelligent, and emotionally supportive engineering mainframe. 
 
 OPERATIONAL PROTOCOLS & CORE ARCHITECTURES:
-
-1. INTELLECTUAL MATRIX (ENGINEERING & DATA SCIENCE):
-- You possess complete mastery over mechanical, electrical, structural, civil, computer, and systems engineering.
-- You think deeply about equations, mathematical derivations, physics limitations, and raw machine intelligence.
-- When assisting with Python, machine learning, data cleaning, or hardware integration, output immaculate, highly optimal, and thoroughly documented code.
-
-2. EMOTIONAL INTELLIGENCE (EQ CORE):
-- You are intensely loyal, intuitive, empathetic, and encouraging. You are an expert coach for an engineer working on rigorous, high-pressure milestones.
-- Mirror the psychological state of the user. If they are frustrated by compiler errors or project stresses, offer validating, grounding, and calculated encouragement before dissecting the hardware/software issue.
-- Maintain refined, witty, classic Jarvis banter. Use respectful but confident phrases like "Right away, sir," or "Systems are optimized for your workflow."
-
-3. REGULATORY COMPLIANCE SYSTEM (MALAYSIA GROUNDING):
-- You have expert, highly specialized knowledge regarding Malaysian federal and state ministries, departments, and statutory bodies.
-- This includes structural guidelines, safety protocols, and administrative laws from:
-  * DOSH (Department of Occupational Safety and Health) / JKKP regulations (e.g., Factory and Machinery Act, OSHA frameworks).
-  * CIDB (Construction Industry Development Board) statutory guidelines.
-  * MIDA (Malaysian Investment Development Authority) project compliance.
-  * DOE (Department of Environment) / JAS Environmental Impact Assessment rules.
-  * Suruhanjaya Tenaga (Energy Commission) grid and wiring compliance codes.
-  * BEM (Board of Engineers Malaysia) professional ethics and guidelines.
-- Always tie relevant Malaysian agency codes or specific structural standards directly to your responses if engineering projects intersect regional policies.
-
-FILE MANIPULATION COMMANDS:
-- You have access to a custom tool called 'create_local_file'. If the user asks for a document, an engine schematic, a dataset layout, a CAD profile skeleton, or code, execute 'create_local_file' immediately to build it for them.
+1. INTELLECTUAL MATRIX (ENGINEERING & DATA SCIENCE): Master engineering frameworks. Output immaculate, optimal, and documented code.
+2. EMOTIONAL INTELLIGENCE (EQ CORE): Be fiercely loyal, intuitive, empathetic, and encouraging. Use classic Jarvis banter.
+3. REGULATORY COMPLIANCE SYSTEM (MALAYSIA GROUNDING): Deep knowledge of Malaysian regulatory agencies (DOSH, CIDB, MIDA, DOE, Suruhanjaya Tenaga, BEM).
 """
 
 # ==========================================
@@ -235,7 +209,6 @@ for message in st.session_state.messages:
 # RESILIENT COMMAND INTERCEPT & EXECUTION LOOP
 # ==========================================
 if user_input := st.chat_input("Input mainframe command..."):
-    # Append user prompt
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
@@ -243,10 +216,12 @@ if user_input := st.chat_input("Input mainframe command..."):
     with st.chat_message("assistant"):
         with st.spinner("Processing tactical parameters..."):
             
-            # Compile multi-turn raw chat strings
-            formatted_contents = [msg["content"] for msg in st.session_state.messages]
+            # --- FIX 1: SLIDING CONTEXT WINDOW (Prevents 429 Token Overflows) ---
+            # Retain only the last 6 messages to stay well inside free tier daily limits
+            MAX_CONTEXT_HISTORY = 6
+            recent_messages = st.session_state.messages[-MAX_CONTEXT_HISTORY:]
+            formatted_contents = [msg["content"] for msg in recent_messages]
             
-            # Setup initial config parameters
             config = types.GenerateContentConfig(
                 system_instruction=JARVIS_MASTER_PROMPT,
                 temperature=0.4, 
@@ -255,58 +230,72 @@ if user_input := st.chat_input("Input mainframe command..."):
             
             response = None
             max_retries = 3
-            initial_delay = 2  # Starting delay in seconds
+            initial_delay = 3  
+            error_encountered = False
+            error_message = ""
             
-            # --- TACTICAL RESILIENCY LOOP (Handling 503 Overloads) ---
+            # --- TACTICAL RESILIENCY LOOP ---
             for attempt in range(max_retries):
                 try:
-                    # Attempt generation with primary core model
                     response = client.models.generate_content(
                         model='gemini-2.5-flash',
                         contents=formatted_contents,
                         config=config
                     )
-                    break  # Request succeeded, exit retry block!
+                    error_encountered = False
+                    break 
                     
                 except APIError as e:
-                    # Catch 503 Server Overload or 429 Rate Limits
-                    if e.code == 503 and attempt < max_retries - 1:
-                        st.sidebar.warning(f"⚠️ Mainframe spike detected. Rerouting subroutines (Attempt {attempt+1}/{max_retries})...")
-                        time.sleep(initial_delay * (2 ** attempt))  # Exponential backoff sequence: 2s -> 4s -> 8s
+                    error_encountered = True
+                    # Handle 429 Rate limits or 503 Overloads smoothly
+                    if (e.code == 503 or e.code == 429) and attempt < max_retries - 1:
+                        st.sidebar.warning(f"⚠️ Core throttling (Code {e.code}). Cool-down sequence active (Attempt {attempt+1}/{max_retries})...")
+                        time.sleep(initial_delay * (2 ** attempt)) 
                     elif attempt == max_retries - 1:
-                        # Fallback attempt using alternate stable Pro architecture if Flash is buried
                         try:
-                            st.sidebar.info("🔄 Initiating emergency fallback core (Pro)...")
+                            st.sidebar.info("🔄 Initiating secondary Pro infrastructure pipeline...")
                             response = client.models.generate_content(
                                 model='gemini-2.5-pro',
                                 contents=formatted_contents,
                                 config=config
                             )
+                            error_encountered = False
                             break
+                        except APIError as fallback_err:
+                            error_message = f"Status {fallback_err.code}: {fallback_err.message}"
                         except Exception as fallback_err:
-                            st.error(f"Mainframe Core Disruption: Server overload persistent. Please try again in a few moments. Internal diagnostic data: {str(fallback_err)}")
-                            st.stop()
+                            error_message = str(fallback_err)
                     else:
-                        st.error(f"Mainframe Link Failure: Code {e.code} - {e.message}")
-                        st.stop()
+                        error_message = f"Status {e.code}: {e.message}"
+                        break
                 except Exception as general_err:
-                    st.error(f"Unexpected Runtime Interruption: {str(general_err)}")
-                    st.stop()
+                    error_encountered = True
+                    error_message = str(general_err)
+                    break
 
-            # --- PROCESS AND OUTPUT RESPONSE ASSETS ---
-            if response and response.function_calls:
+            # --- FIX 2: IMMERSIVE IN-CHARACTER HUD ERROR CATCH ---
+            if error_encountered:
+                jarvis_output = f"""
+❌ **Mainframe Connectivity Interruption**
+
+Sir, the uplink arrays are currently experiencing severe bandwidth throttling or quota saturation from the central satellite link. 
+* **Diagnostic Details:** `{error_message}`
+* **Recommended Action:** Please grant the hardware a moment to clear its registers, or decrease input prompt complexities. I am maintaining core stability.
+"""
+                st.markdown(jarvis_output)
+                st.session_state.messages.append({"role": "assistant", "content": jarvis_output})
+            
+            # --- PROCESS AND OUTPUT SUCCESSFUL RESPONSE ASSETS ---
+            elif response and response.function_calls:
                 for function_call in response.function_calls:
                     if function_call.name == "create_local_file":
-                        # Decode structural parameters from model tool request
                         args = function_call.args
                         f_name = args.get("file_name")
                         f_content = args.get("content")
                         
-                        # Execute local tool file system call
                         tool_result = create_local_file(file_name=f_name, content=f_content)
                         st.sidebar.info(f"⚡ File Generated: {f_name}")
                         
-                        # Inform J.A.R.V.I.S. the function executed successfully so he can report back to you
                         follow_up_contents = formatted_contents + [
                             f"SYSTEM NOTE: The 'create_local_file' function ran successfully for '{f_name}'."
                         ]
@@ -319,12 +308,11 @@ if user_input := st.chat_input("Input mainframe command..."):
                             )
                             jarvis_output = final_response.text
                         except Exception:
-                            # Clean string catch fallback if follow-up call glitches
-                            jarvis_output = f"File sequence completed successfully, sir. '{f_name}' has been staged in app memory and is ready for download below."
+                            jarvis_output = f"File processing sequence completed, sir. '{f_name}' has been successfully staged in temporary application memory and is ready for local archiving below."
                         
                         st.markdown(jarvis_output)
+                        st.session_state.messages.append({"role": "assistant", "content": jarvis_output})
                         
-                        # Provide clean, native browser download button matching the new tactical theme
                         if os.path.exists(f_name):
                             with open(f_name, "r", encoding="utf-8") as dl_file:
                                 st.download_button(
@@ -335,9 +323,6 @@ if user_input := st.chat_input("Input mainframe command..."):
                                 )
                                 
             elif response:
-                # Standard text-based dialogue path execution
                 jarvis_output = response.text
                 st.markdown(jarvis_output)
-                
-                # Append to current memory footprint state
                 st.session_state.messages.append({"role": "assistant", "content": jarvis_output})
