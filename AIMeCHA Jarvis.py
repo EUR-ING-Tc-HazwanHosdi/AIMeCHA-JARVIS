@@ -186,6 +186,10 @@ if "chat_history" not in st.session_state:
         {"role": "model", "text": "A.I.M.E.C.H.A. framework fully initialized. Emotional and regulatory subroutines loaded. Awaiting your instructions, sir."}
     ]
 
+# Explicit production directory routing names for the 1.5 architecture
+PRIMARY_MODEL = "models/gemini-1.5-flash"
+BACKUP_MODEL = "models/gemini-1.5-pro"
+
 # Initialize or restore the true persistent back-end chat instance
 if "jarvis_session" not in st.session_state:
     config = types.GenerateContentConfig(
@@ -193,9 +197,8 @@ if "jarvis_session" not in st.session_state:
         temperature=0.4, 
         tools=tools_list
     )
-    # Using 1.5-flash as the fresh base model to work past your current 2.5 quota limit
     st.session_state.jarvis_session = client.chats.create(
-        model='gemini-1.5-flash',
+        model=PRIMARY_MODEL,
         config=config
     )
 
@@ -210,7 +213,7 @@ if st.sidebar.button("🧹 Clear Mainframe Memory"):
         tools=tools_list
     )
     st.session_state.jarvis_session = client.chats.create(
-        model='gemini-1.5-flash',
+        model=PRIMARY_MODEL,
         config=config
     )
     st.rerun()
@@ -259,7 +262,7 @@ if user_input := st.chat_input("Input mainframe command..."):
                                 temperature=0.4, tools=tools_list
                             )
                             # Create temporary conversation window for the emergency response
-                            temp_session = client.chats.create(model='gemini-1.5-pro', config=fallback_config)
+                            temp_session = client.chats.create(model=BACKUP_MODEL, config=fallback_config)
                             response = temp_session.send_message(user_input)
                             error_encountered = False
                             break
