@@ -66,7 +66,7 @@ st.markdown("""
 # ==========================================
 # HEADER WITH A.I.M.E.C.H.A. LOGO
 # ==========================================
-header_col1, header_col2 = st.columns([50, 12])
+header_col1, header_col2 = st.columns([5, 12])
 
 with header_col1:
     logo_path = "AIMeCHA Logo.png"
