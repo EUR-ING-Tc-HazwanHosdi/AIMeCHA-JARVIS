@@ -29,6 +29,14 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Header Section
+col1, col2 = st.columns([1, 6])
+with col1:
+    if os.path.exists("aimecha_logo.png"):
+        st.image("aimecha_logo.png", width=100)
+with col2:
+    st.markdown("<div class='main-header'><h1>A.I.M.E.C.H.A. | J.A.R.V.I.S.</h1></div>", unsafe_allow_html=True)
+
 st.title("🤖 J.A.R.V.I.S. AI Engine")
 st.sidebar.title("⚙️ System Status")
 st.sidebar.success("Cognitive Core: ONLINE")
