@@ -15,17 +15,51 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
     
-    .stApp { background-color: #050B14; color: #E2F1F8; font-family: 'Orbitron', sans-serif; }
+    .stApp { 
+        background-color: #050B14; 
+        color: #E2F1F8; 
+        font-family: 'Orbitron', sans-serif; 
+    }
     
-    /* Header & Branding */
-    .main-header { display: flex; align-items: center; gap: 20px; border-bottom: 2px solid #00E5FF; padding-bottom: 10px; margin-bottom: 20px; }
-    h1 { color: #00E5FF !important; text-transform: uppercase; letter-spacing: 3px; font-weight: 700; }
-    
-    /* HUD Elements */
-    .stButton>button { background-color: #002B3D; color: #00E5FF; border: 1px solid #00E5FF; border-radius: 0; font-family: 'Orbitron'; }
-    .stButton>button:hover { background-color: #00E5FF; color: #050B14; }
-    .stChatMessage { background-color: #0A192F; border-left: 4px solid #00E5FF; border-radius: 0; box-shadow: 2px 2px 10px rgba(0, 229, 255, 0.1); }
-    .stSidebar { background-color: #050B14; border-right: 1px solid #005B7F; }
+    /* NEON GLOW EFFECTS */
+    .stApp {
+        background: radial-gradient(circle at center, #0B1E30 0%, #050B14 70%);
+    }
+
+    h1, h2, h3 { 
+        color: #00E5FF !important; 
+        text-transform: uppercase; 
+        letter-spacing: 4px; 
+        text-shadow: 0 0 10px #00E5FF, 0 0 20px #00E5FF;
+    }
+
+    /* ARC REACTOR HUD BUTTONS */
+    .stButton>button { 
+        background-color: #002B3D; 
+        color: #00E5FF; 
+        border: 2px solid #00E5FF; 
+        box-shadow: 0 0 10px #00E5FF;
+        transition: all 0.3s ease;
+    }
+    .stButton>button:hover { 
+        background-color: #00E5FF; 
+        color: #050B14; 
+        box-shadow: 0 0 30px #00E5FF;
+    }
+
+    /* CHAT BUBBLE GLOW */
+    .stChatMessage { 
+        background-color: #0A192F; 
+        border: 1px solid #005B7F;
+        box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);
+        border-left: 5px solid #00E5FF;
+    }
+
+    /* SIDEBAR HUD */
+    .stSidebar {
+        border-right: 2px solid #00E5FF;
+        box-shadow: 5px 0 15px rgba(0, 229, 255, 0.2);
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -37,11 +71,11 @@ header_col1, header_col2 = st.columns([900, 900])
 with header_col1:
     # Using the exact filename from your repository screenshot
     logo_path = "AIMeCHA Logo.png"
-    if os.path.exists(logo_path):
-        st.image(logo_path, width=350)
-    else:
-        st.error("Logo file not found. Ensure 'AIMeCHA Logo.png' is in the root directory.")
-
+    if os.path.exists("AIMeCHA Logo.png"):
+    st.markdown('<div class="logo-glow">', unsafe_allow_html=True)
+    st.image("AIMeCHA Logo.png", width=350)
+    st.markdown('</div>', unsafe_allow_html=True)
+    
 st.title("🤖 J.A.R.V.I.S. AI Engine")
 st.sidebar.title("⚙️ System Status")
 st.sidebar.success("Cognitive Core: ONLINE")
