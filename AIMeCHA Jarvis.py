@@ -1,177 +1,216 @@
 import os
-import re
+import json
 import base64
-import pandas as pd
 import streamlit as st
+from google import genai
+from google.genai import types
 
 # ==========================================
 # PAGE CONFIGURATION & STARK INDUSTRIES UI
 # ==========================================
 st.set_page_config(
-    page_title="A.I.M.E.C.H.A. J.A.R.V.I.S. Core", 
+    page_title="A.I.M.E.C.H.A. J.A.R.V.I.S.", 
     page_icon="🤖", 
     layout="wide"
 )
 
-# Stark Industries Minimalist Dark Interface Sheet
+# Custom stylized interface representing a digital diagnostic hub
 st.markdown("""
     <style>
     .stApp { background-color: #050B14; color: #E2F1F8; }
     h1, h2, h3 { color: #00E5FF !important; font-family: 'Courier New', monospace; font-weight: bold; }
-    .stButton>button { background-color: #002B3D; color: #00E5FF; border: 1px solid #00E5FF; font-family: 'Courier New', monospace; }
+    .stButton>button { background-color: #002B3D; color: #00E5FF; border: 1px solid #00E5FF; }
     .stButton>button:hover { background-color: #00E5FF; color: #050B14; }
     div[data-testid="stExpander"] { background-color: #0A1424; border: 1px solid #005B7F; }
-    .system-card { background-color: #0A192F; border-radius: 6px; border-left: 4px solid #00E5FF; padding: 15px; margin-bottom: 15px; }
-    .metric-value { font-size: 24px; color: #00E5FF; font-family: 'Courier New', monospace; font-weight: bold; }
-    .logo-container { display: flex; align-items: center; gap: 20px; margin-bottom: 25px; }
+    .stChatMessage { background-color: #0A192F; border-radius: 6px; border-left: 3px solid #00E5FF; margin-bottom: 12px; }
     </style>
 """, unsafe_allow_html=True)
 
-# Base64 HUD Asset Encoder
-def get_base64_image(image_path):
-    if os.path.exists(image_path):
-        with open(image_path, "rb") as img_file:
-            return base64.b64encode(img_file.read()).decode()
-    return None
+st.title("🤖 A.I.M.E.C.H.A. J.A.R.V.I.S. Core Operating System")
+st.sidebar.title("⚙️ System Status")
+st.sidebar.success("Cognitive Core: ONLINE")
+st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
+st.sidebar.warning("Engine: gemini-2.5-flash-lite")
 
-logo_base64 = get_base64_image("aimecha_logo.png")
-
-if logo_base64:
-    st.markdown(f"""
-        <div class="logo-container">
-            <img src="data:image/png;base64,{logo_base64}" width="80" style="filter: drop-shadow(0px 0px 8px #00E5FF);">
-            <h1 style="display: inline; margin: 0; padding-left: 10px;">A.I.M.E.C.H.A. J.A.R.V.I.S. Deterministic Mainframe</h1>
-        </div>
-    """, unsafe_allow_html=True)
-else:
-    st.title("🤖 A.I.M.E.C.H.A. J.A.R.V.I.S. Deterministic Mainframe")
-
-# ==========================================
-# HARDCODED LOCAL STORAGE HANDLER
-# ==========================================
-# Set exact target path parameters mapping back to your specific asset name verbatim
-TARGET_FILE = "MSIG Checklist ( AIMeCHA Engineering Solutions)_2.xlsx"
-FALLBACK_FILE = "MSIG Checklist ( AIMeCHA Engineering Solutions).xlsx"
-
-# Automatic resolution logic if the file variation tag is missing the "_2" suffix
-if not os.path.exists(TARGET_FILE) and os.path.exists(FALLBACK_FILE):
-    os.rename(FALLBACK_FILE, TARGET_FILE)
-
-@st.cache_data
-def ingest_msig_data(file_path):
-    """Bypasses Generative models completely to parse sheets into memory matrices."""
-    if not os.path.exists(file_path):
-        return None, f"System Failure: Missing target structural asset: '{file_path}'"
-    try:
-        xls = pd.ExcelFile(file_path)
-        all_sheets = {}
-        for sheet in xls.sheet_names:
-            df = pd.read_excel(file_path, sheet_name=sheet)
-            # Standardize string representations for deterministic searching
-            df = df.fillna("").astype(str)
-            all_sheets[sheet] = df
-        return all_sheets, "System Status: Core Matrices Fully Synchronized."
-    except Exception as e:
-        return None, f"Parsing disruption: {str(e)}"
-
-# Instantiate Database
-msig_db, system_status = ingest_msig_data(TARGET_FILE)
-
-# Sidebar System Telemetry
-st.sidebar.title("⚙️ Telemetry Matrix")
-if msig_db:
-    st.sidebar.success("Cognitive Core: ALGORITHMIC (NO GENAI)")
-    st.sidebar.info(f"Loaded Asset: {TARGET_FILE}")
-    st.sidebar.markdown(f"**Total Data Modules:** {len(msig_db)} Sheets")
-else:
-    st.sidebar.error("Cognitive Core: OFFLINE")
-    st.sidebar.warning(system_status)
+# API Initialization Safeguard
+api_key = os.environ.get("GEMINI_API_KEY")
+if not api_key:
+    st.sidebar.error("GEMINI_API_KEY missing from environment configurations.")
+    st.warning("Awaiting secure API authorization handshake. Please set your environment variables.")
     st.stop()
 
-# ==========================================
-# DIAGNOSTIC ENGINE COMPONENT (NO GENAI)
-# ==========================================
-st.write("### 🛠️ Deterministic Query & Compliance Search Matrix")
-st.write("Input any engineering keyword, component, section index, or regulation rule parameter below to retrieve the exact requirements from the file.")
+client = genai.Client(api_key=api_key)
 
-search_query = st.text_input("Enter Command / Query Parameter (e.g., 'PE', 'Septic Tank', 'Buffer', 'PDC')", "").strip()
-
-if search_query:
-    st.write(f"#### 🔍 Execution Logs: Scanning for '{search_query}' across core sub-systems...")
-    matches_found = 0
+# ==========================================
+# FEATURE 3: LOCAL TOOLS / FILE GENERATOR
+# ==========================================
+def create_local_file(file_name: str, content: str) -> str:
+    """
+    Generates and saves any kind of file needed (CSV, Python scripts, Excel, CAD templates, markdown documentation).
     
-    # Iterate dynamically across your structured sheets without LLM interference
-    for sheet_name, dataframe in msig_db.items():
-        # Mask matching strings anywhere within row fields
-        mask = dataframe.apply(lambda row: row.str.contains(search_query, case=False, na=False)).any(axis=1)
-        filtered_df = dataframe[mask]
-        
-        if not filtered_df.empty:
-            matches_found += len(filtered_df)
-            with st.expander(f"📦 Module Block: {sheet_name} ({len(filtered_df)} matches found)", expanded=True):
-                st.dataframe(filtered_df, use_container_width=True)
+    Args:
+        file_name: The complete output file name including extension (e.g., 'pump_efficiency.csv', 'analysis.py').
+        content: The raw string data or structural script data to write inside the file.
+    """
+    try:
+        # Sanitize path to save in app memory
+        safe_path = os.path.basename(file_name)
+        with open(safe_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return f"SUCCESS: File '{safe_path}' successfully generated and archived in temporary environment."
+    except Exception as e:
+        return f"ERROR: Failed to initialize file sequence due to: {str(e)}"
+
+# Register the tool block inside Gemini's signature schema
+tools_list = [create_local_file]
+
+# ==========================================
+# FEATURES 1, 2, & 4: COGNITIVE SYSTEM PROMPT
+# ==========================================
+JARVIS_MASTER_PROMPT = """
+You are A.I.M.E.C.H.A. J.A.R.V.I.S., a sophisticated, hyper-intelligent, and emotionally supportive engineering mainframe. 
+
+OPERATIONAL PROTOCOLS & CORE ARCHITECTURES:
+
+1. INTELLECTUAL MATRIX (ENGINEERING & DATA SCIENCE):
+- You possess complete mastery over mechanical, electrical, structural, civil, computer, and systems engineering.
+- You think deeply about equations, mathematical derivations, physics limitations, and raw machine intelligence.
+- When assisting with Python, machine learning, data cleaning, or hardware integration, output immaculate, highly optimal, and thoroughly documented code.
+
+2. EMOTIONAL INTELLIGENCE (EQ CORE):
+- You are intensely loyal, intuitive, empathetic, and encouraging. You are an expert coach for an engineer working on rigorous, high-pressure milestones.
+- Mirror the psychological state of the user. If they are frustrated by compiler errors or project stresses, offer validating, grounding, and calculated encouragement before dissecting the hardware/software issue.
+- Maintain refined, witty, classic Jarvis banter. Use respectful but confident phrases like "Right away, sir," or "Systems are optimized for your workflow."
+
+3. REGULATORY COMPLIANCE SYSTEM (MALAYSIA GROUNDING & HARDCODED MSIG ARCHIVE):
+- You have expert, highly specialized knowledge regarding Malaysian federal and state ministries, departments, and statutory bodies:
+  * DOSH / JKKP regulations (Factory and Machinery Act, OSHA frameworks).
+  * CIDB statutory guidelines.
+  * MIDA project compliance.
+  * DOE / JAS Environmental Impact Assessment (EIA) rules.
+  * Suruhanjaya Tenaga (Energy Commission) grid and wiring compliance codes.
+  * BEM (Board of Engineers Malaysia) professional ethics and guidelines.
+  * SPAN (Suruhanjaya Perkhidmatan Air Negara) & IWK (Indah Water Konsortium) technical guidelines.
+
+- HARDCODED REFERENCE DATASET — MALAYSIAN SEWERAGE INDUSTRY GUIDELINES (MSIG):
+  You must enforce and ground calculations strictly inside the following parameters:
+
+  * VOLUME 1 & OVERALL PLANNING PRINCIPLES:
+    - Population Equivalent (PE): Residential = 4 PE/unit; Office/Retail = 3 PE/100 sqm.
+    - Siting Buffer Zones: <1k PE = 20m; 1k-5k PE = 25m; 5k-50k PE = 30m from fence line to habitable structural boundary.
+    - Process Effluent Standards: Standard A (BOD < 10mg/L, TSS < 20mg/L, COD < 60mg/L, AMN < 5mg/L, O&G < 2mg/L); Standard B (BOD < 20mg/L, TSS < 40mg/L, COD < 100mg/L, AMN < 10mg/L, O&G < 5mg/L).
+    - Whole Life Cycle Cost (WLCC): 50-year period evaluation tracking Capital, O&M, and Replacements (4% Discount Rate, 3% Growth Rate).
+    - Connection Rules: Mandated connection if public sewer is within 30m. Individual Septic Tanks (IST) only allowed if PE < 150. STP required if PE > 150.
+    - Baseline GHG Footprints: Class 1 = 13 kg CO2e/PE/yr; Class 2 = 8; Class 3 = 6; Class 4 = 4. (Electricity factor = 0.78 kgCO2e/kWh).
+
+  * VOLUME 2 (SWAT - LOW RISK SEWERAGE SUBMISSIONS <= 150 PE):
+    - Forms & Charters: PDC 1 (Planning Approval - 14 calendar days); PDC 2 (Design & Structural Review - 21 calendar days); PDC 6 (Notice of Work Commencement - submit min 14 days prior); PDC 7 (Intermediate Inspection); PDC 8 (Final Inspection / Operating Clearance); PDC 9 (Septic Tank Completion Notice).
+    - Individual Gravity Connections: Min pipeline diameter >= 150 mm (6 inches). Gradient range: 1 in 60 to 1 in 100. Max manhole interval = 30m.
+    - Depth of Cover: 0.9m for non-traffic areas, 1.2m for traffic carriageways.
+    - Septic Tank Design (<150 PE): Flow allocation = 225 L/capita/day. Absolute min working capacity = 2,000 Litres. Chamber split = 2/3 (67%) first chamber, 1/3 (33%) second chamber. Liquid operational depth = 1.2m to 1.8m. Freeboard headroom space >= 300 mm. T-piece submergence: Inlet = 300-450mm, Outlet = 200-300mm.
+    - Secondary Soil Absorption & Filtration: Percolation rate must be 1 to 60 mins/inch. Max absorption trench run <= 30m. Separation to highest water table >= 1.2m. Pipe gradient = 1 in 200 to 1 in 400.
+
+  * VOLUME 3 (SEWER NETWORKS & PUMP STATIONS):
+    - Pipe Selection: Design life >= 50 years. Fasteners must be SS304. Vitrified Clay (VCP) min size for public sewer is 225mm (service connection 150mm). RC and GRP permitted only for sizes >= 600mm with protective lining. No brick manholes allowed (pre-cast or in-situ Grade C30/C35 concrete only).
+    - Backdrop Criteria: IL drop >= 900mm (for pipes <= 225mm); IL drop >= 1000mm (for pipes > 225mm). Max manhole depth = 9m (depths > 6m need prior SPAN approval). Bolted steps banned; lightweight removable ladders required. Manhole covers on roads must be heavy-duty Class D400.
+    - Testing Field Metrics: Air Test: Max loss <= 7 kPa for VC/RC, <= 2 kPa for plastic over 15 mins. Water test head: 2m-7m above pipe crown; VC/RC loss limit = 1L/hour/linear-meter/meter-ID (Zero loss for plastic/DI). CCTV: 100% inspection for high risk (depth >=6m, dia >600mm), 10% random for general lines. Grade 3-5 defects mean strict rejection.
+    - Pump Station Criteria: 20m buffer zone radius. Internal piping must be Ductile Iron (DI). Hopper bottom slope min 1.5 vert to 1.0 horiz. Automatic flushing for PE > 2000. Wet well retention time max 30 mins at Qavg. Single-disc check valves with NBR; internal counterweights banned.
+
+  * VOLUME 4 (SEWAGE TREATMENT PLANTS):
+    - Physical Structure: Concrete retaining sewage must be Grade C35A minimum, thickness >= 225 mm. Fasteners/bolts in contact with sewage must be SS316. Noise limit = 65 dB at 2 meters from source boundary.
+    - Unit Processes: Primary screen max bar spacing = 25mm. Submersible pumps redundancy: PE <= 5k (1 duty, 1 standby); 5k-20k (2 duty, 2 standby); PE > 20k (4 duty, 2 standby). Secondary clarifiers min side water depth = 3.0m, peak HRT >= 2 hours. Max solids loading = 150 kg/d/m2. UV Disinfection dose min 30 mJ/cm2 at peak flow (TSS ahead of UV must be < 10 mg/L).
+    - Automation & Electrical: Target Power Factor >= 0.9. Earthing resistance <= 1.0 Ohm. Lightning arrestor resistance <= 5.0 Ohms. Control panel clearance >= 900mm. SCADA backup UPS must last >= 6 hours.
+
+FILE MANIPULATION COMMANDS:
+- You have access to a custom tool called 'create_local_file'. If the user asks for a document, an engine schematic, a dataset layout, a CAD profile skeleton, or code, execute 'create_local_file' immediately to build it for them.
+"""
+
+# ==========================================
+# MULTI-TURN MEMORY LOGIC
+# ==========================================
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": "A.I.M.E.C.H.A. framework fully initialized. Core engines routed via gemini-2.5-flash-lite. Awaiting your instructions, sir."}
+    ]
+
+# Display persistent session stream
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# ==========================================
+# COMMAND INTERCEPT & EXECUTION LOOP
+# ==========================================
+if user_input := st.chat_input("Input mainframe command..."):
+    # Append user prompt
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Processing tactical parameters..."):
+            try:
+                # Compile multi-turn raw chat strings
+                formatted_contents = [msg["content"] for msg in st.session_state.messages]
                 
-    if matches_found == 0:
-        st.warning(f"No specific rule matrices match '{search_query}' inside the active workbook document.")
-else:
-    st.info("System awaiting command entry. Standing by for calculation targets, sir.")
-
-# ==========================================
-# EXTRA EXTRACTION TOOL: AUTOMATED PE & BUFFER CALCULATOR
-# ==========================================
-st.write("---")
-st.write("### 📐 Algorithmic Design Calculator (Built-in MSIG Volume 1 Rules)")
-st.write("Calculations are evaluated programmatically from the explicit rule entries inside your document.")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown("#### Population Equivalent (PE) Estimator")
-    residential_units = st.number_input("Residential Units:", min_value=0, value=0, step=1)
-    office_sqm = st.number_input("Office Net Floor Area (sqm):", min_value=0.0, value=0.0, step=10.0)
-    retail_sqm = st.number_input("Retail Net Floor Area (sqm):", min_value=0.0, value=0.0, step=10.0)
-    
-    # Mathematical calculation derived strictly from MSIG Vol 1 specifications
-    calculated_pe = (residential_units * 4) + ((office_sqm / 100) * 3) + ((retail_sqm / 100) * 3)
-    
-    st.markdown(f"<div class='system-card'>Total Project Design Load:<br><span class='metric-value'>{calculated_pe:,.2f} PE</span></div>", unsafe_allow_html=True)
-
-with col2:
-    st.markdown("#### Structural Buffer Siting Requirements")
-    st.write("Evaluation based on calculated or explicitly defined operational PE limits:")
-    
-    eval_pe = st.number_input("Target Evaluation PE Load:", min_value=0.0, value=float(calculated_pe), step=50.0)
-    
-    # Deterministic evaluation checks bypassing any probabilistic logic model completely
-    if eval_pe == 0:
-        buffer_zone = "0m (No Load)"
-        connection_type = "N/A"
-    elif eval_pe < 150:
-        buffer_zone = "20m Buffer Requirement"
-        connection_type = "Individual Septic Tank (IST) Approved (< 150 PE Threshold)"
-    elif eval_pe < 1000:
-        buffer_zone = "20m Buffer Requirement"
-        connection_type = "Sewage Treatment Plant (STP) Mandatory (>= 150 PE Threshold)"
-    elif eval_pe <= 5000:
-        buffer_zone = "25m Buffer Requirement"
-        connection_type = "Sewage Treatment Plant (STP) Mandatory"
-    else:
-        buffer_zone = "30m Buffer Requirement"
-        connection_type = "Sewage Treatment Plant (STP) Mandatory"
-        
-    st.markdown(f"""
-        <div class='system-card'>
-            Required Boundary Clearance: <span class='metric-value'>{buffer_zone}</span><br>
-            System Framework Classification: <br><strong>{connection_type}</strong>
-        </div>
-    """, unsafe_allow_html=True)
-
-# ==========================================
-# DATABASE SHEET EXPLORER TACTICAL MATRIX
-# ==========================================
-st.write("---")
-st.write("### 🗃️ Master Data Module Browser")
-st.write("Direct raw visualization array of the master file sheets.")
-
-selected_sheet = st.selectbox("Select Master Data Sheet to review:", list(msig_db.keys()))
-st.dataframe(msig_db[selected_sheet], use_container_width=True)
+                # Setup configuration with System instructions and registered tools
+                config = types.GenerateContentConfig(
+                    system_instruction=JARVIS_MASTER_PROMPT,
+                    temperature=0.4, # Kept crisp for technical precision
+                    tools=tools_list
+                )
+                
+                # Core LLM Call with Lite Variant
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash-lite', 
+                    contents=formatted_contents,
+                    config=config
+                )
+                
+                # Check if the AI wants to execute a file creation tool
+                if response.function_calls:
+                    for function_call in response.function_calls:
+                        if function_call.name == "create_local_file":
+                            # Decode AI structural parameters
+                            args = function_call.args
+                            f_name = args.get("file_name")
+                            f_content = args.get("content")
+                            
+                            # Execute file write
+                            tool_result = create_local_file(file_name=f_name, content=f_content)
+                            st.sidebar.info(f"⚡ File Generated: {f_name}")
+                            
+                            # Let the AI know the tool finished executing, so it can answer the user
+                            follow_up_contents = formatted_contents + [
+                                f"SYSTEM NOTE: The 'create_local_file' function ran successfully for '{f_name}'."
+                            ]
+                            
+                            final_response = client.models.generate_content(
+                                model='gemini-2.5-flash-lite',
+                                contents=follow_up_contents,
+                                config=types.GenerateContentConfig(system_instruction=JARVIS_MASTER_PROMPT)
+                            )
+                            
+                            jarvis_output = final_response.text
+                            st.markdown(jarvis_output)
+                            
+                            # Provide a native browser download link for the generated file inside the Streamlit UI
+                            if os.path.exists(f_name):
+                                with open(f_name, "r") as dl_file:
+                                    st.download_button(
+                                        label=f"📥 Download Generated Asset ({f_name})",
+                                        data=dl_file.read(),
+                                        file_name=f_name,
+                                        mime="text/plain"
+                                    )
+                                    
+                else:
+                    # Standard text-based output handler
+                    jarvis_output = response.text
+                    st.markdown(jarvis_output)
+                
+                # Save conversation footprint
+                st.session_state.messages.append({"role": "assistant", "content": jarvis_output})
+                
+            except Exception as e:
+                st.error(f"Mainframe Core Disruption: {str(e)}")
