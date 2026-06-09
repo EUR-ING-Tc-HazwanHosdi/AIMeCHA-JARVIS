@@ -1,8 +1,9 @@
 import os
-import random
-import re
 import json
+import base64
 import streamlit as st
+from google import genai
+from google.genai import types
 
 # ==========================================
 # PAGE CONFIGURATION & STARK INDUSTRIES UI
@@ -29,171 +30,187 @@ st.title("🤖 A.I.M.E.C.H.A. J.A.R.V.I.S. Core Operating System")
 st.sidebar.title("⚙️ System Status")
 st.sidebar.success("Cognitive Core: ONLINE")
 st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
-st.sidebar.error("Engine: Hardcoded Custom Python Core (No APIs / No Third Party Apps)")
+st.sidebar.warning("Engine: gemini-2.5-flash-lite")
+
+# API Initialization Safeguard
+api_key = os.environ.get("GEMINI_API_KEY")
+if not api_key:
+    st.sidebar.error("GEMINI_API_KEY missing from environment configurations.")
+    st.warning("Awaiting secure API authorization handshake. Please set your environment variables.")
+    st.stop()
+
+client = genai.Client(api_key=api_key)
 
 # ==========================================
-# FEATURE 3: HARDCODED LOCAL TOOLS ENGINE
+# FEATURE 3: LOCAL TOOLS / FILE GENERATOR
 # ==========================================
 def create_local_file(file_name: str, content: str) -> str:
     """
-    Generates and saves any kind of file needed entirely offline.
+    Generates and saves any kind of file needed (CSV, Python scripts, Excel, CAD templates, markdown documentation).
+    
+    Args:
+        file_name: The complete output file name including extension (e.g., 'pump_efficiency.csv', 'analysis.py').
+        content: The raw string data or structural script data to write inside the file.
     """
     try:
+        # Sanitize path to save in app memory
         safe_path = os.path.basename(file_name)
         with open(safe_path, "w", encoding="utf-8") as f:
             f.write(content)
-        return f"SUCCESS"
+        return f"SUCCESS: File '{safe_path}' successfully generated and archived in temporary environment."
     except Exception as e:
-        return f"ERROR: {str(e)}"
+        return f"ERROR: Failed to initialize file sequence due to: {str(e)}"
+
+# Register the tool block inside Gemini's signature schema
+tools_list = [create_local_file]
 
 # ==========================================
-# NATIVE HARDCODED TEXT GENERATION ENGINE
-# ==========================================
-class HardcodedMarkovEngine:
-    def __init__(self, corpus_text, state_size=2):
-        self.state_size = state_size
-        self.model = {}
-        self.fit(corpus_text)
-        
-    def fit(self, text):
-        # Tokenize words cleanly while keeping numbers and standard symbols
-        words = re.findall(r'\b\w+\b|[:\-\.\(\)\>\<]', text.lower())
-        
-        for i in range(len(words) - self.state_size):
-            state = tuple(words[i:i + self.state_size])
-            next_word = words[i + self.state_size]
-            
-            if state not in self.model:
-                self.model[state] = []
-            self.model[state].append(next_word)
-            
-    def generate_response(self, user_prompt, max_words=80):
-        # Standard witty Jarvis baseline prefixes to structure responses
-        jarvis_banter = [
-            "Right away, sir. Systems are optimized. Analyzing your request regarding ",
-            "Parameters acknowledged, sir. Processing structural metrics for ",
-            "I have run the diagnostic matrices for your inquiry regarding "
-        ]
-        
-        response_prefix = random.choice(jarvis_banter) + f"'{user_prompt}'. "
-        
-        # Keyword token extractor
-        input_words = re.findall(r'\b\w+\b', user_prompt.lower())
-        seed_state = None
-        
-        for word in input_words:
-            matching_states = [state for state in self.model.keys() if word in state]
-            if matching_states:
-                seed_state = random.choice(matching_states)
-                break
-                
-        if not seed_state:
-            seed_state = random.choice(list(self.model.keys()))
-            
-        generated_tokens = list(seed_state)
-        current_state = seed_state
-        
-        for _ in range(max_words):
-            if current_state in self.model:
-                next_word = random.choice(self.model[current_state])
-                generated_tokens.append(next_word)
-                current_state = tuple(generated_tokens[-self.state_size:])
-            else:
-                break
-                
-        raw_output = " ".join(generated_tokens)
-        cleaned_output = re.sub(r'\s+([:\-\.\(\)\>\<])', r'\1', raw_output)
-        cleaned_output = re.sub(r'([:\-\.\(\)\>\<])\s+', r'\1', cleaned_output)
-        
-        sentences = cleaned_output.split('. ')
-        capitalized_sentences = [s.capitalize() for s in sentences if s]
-        base_body = ". ".join(capitalized_sentences) + "."
-        
-        # DETECT IF USER IS ASKING FOR A FILE ENHANCEMENT
-        # If keywords match, we inject an explicit script block directly via our hardcoded response matrix
-        file_attachment_block = ""
-        if any(x in user_prompt.lower() for x in ["file", "script", "csv", "generate", "save"]):
-            # Predict name based on search keywords
-            predicted_filename = "msig_extracted_metrics.csv"
-            if "script" in user_prompt.lower() or "python" in user_prompt.lower():
-                predicted_filename = "compliance_checker.py"
-                file_content = f"# Generated natively by J.A.R.V.I.S.\nprint('Executing local regulatory check for Malaysia MSIG...')\n"
-            else:
-                file_content = f"Metric,Value,Guideline_Reference\nPopulation_Equivalent_Residential,4,Volume_1\nBuffer_Zone_Under_1k_PE,20m,Volume_1\nMin_Gravity_Pipe_Dia,150mm,Volume_2\n"
-            
-            # Execute physical write
-            status = create_local_file(predicted_filename, file_content)
-            if status == "SUCCESS":
-                file_attachment_block = f"|||ATTACHMENT:{predicted_filename}|||"
-
-        return response_prefix + "\n\nBased on core architecture parameters: \n\n" + base_body + file_attachment_block
-
-# ==========================================
-# TEXT GENERATION ENGINE CORE CORPUS
+# FEATURES 1, 2, & 4: COGNITIVE SYSTEM PROMPT
 # ==========================================
 JARVIS_MASTER_PROMPT = """
-You are A.I.M.E.C.H.A. J.A.R.V.I.S., a sophisticated, hyper-intelligent engineering mainframe.
-Population Equivalent PE calculation parameters. Residential is equal to 4 PE per unit. Office and Retail metrics equal 3 PE per 100 sqm space.
-Siting Buffer Zones criteria requires distances. Systems less than 1k PE require 20m separation. Systems ranging 1k-5k PE require 25m buffer. Systems from 5k-50k PE mandate 30m distance boundaries from habitable structures.
-Process Effluent Standards mandate strict parameters. Standard A dictates BOD < 10mg/L, TSS < 20mg/L, COD < 60mg/L, AMN < 5mg/L, O&G < 2mg/L. Standard B dictates BOD < 20mg/L, TSS < 40mg/L, COD < 100mg/L, AMN < 10mg/L, O&G < 5mg/L.
-Whole Life Cycle Cost tracks a 50-year evaluation scaling capital assets and replacements using a 4% Discount Rate and 3% Growth Rate parameters.
-Connection Rules dictate a mandatory public sewer line hookup if within 30m boundaries. Individual Septic Tanks are strictly restricted to PE < 150 allocations. Sewage Treatment Plants are mandated if PE > 150.
-Individual Gravity Connections mandate a minimum pipeline diameter size >= 150 mm. Gradient boundaries must follow a strict range of 1 in 60 to 1 in 100. Maximum manhole interval distance equals 30m.
-Depth of Cover requires 0.9m for non-traffic zones and 1.2m for traffic carriageways.
-Septic Tank Design for systems <= 150 PE requires flow allocations of 225 L/capita/day. Absolute minimum operational capacity equals 2000 Litres. Chamber split criteria requires 2/3 space for the first chamber and 1/3 space for the second chamber. Liquid operational depth must fall between 1.2m to 1.8m boundaries. Freeboard headroom space must be >= 300 mm. T-piece submergence requires 300-450mm at the inlet and 200-300mm at the outlet arrays.
-Secondary Soil Absorption networks require percolation rates between 1 to 60 mins/inch. Maximum absorption trench run length is <= 30m. Clear separation to the highest local water table must be >= 1.2m. Pipe gradient configurations must line up between 1 in 200 to 1 in 400.
-Pipe Selection rules guarantee design lives >= 50 years. All structural fasteners must be SS304. Vitrified Clay public sewers require a minimum size of 225mm. Reinforced Concrete and GRP options are permitted only for line sizes >= 600mm with certified protective lining. No brick manholes are allowed. Pre-cast or in-situ Grade C30 or C35 concrete must be utilized.
-Backdrop Criteria mandates an IL drop >= 900mm for line sizes <= 225mm and an IL drop >= 1000mm for pipes > 225mm. Maximum allowable manhole depth equals 9m. Depth settings > 6m require prior formal SPAN authorization approvals. Bolted steps are banned. Lightweight removable ladders must be utilized. Manhole covers situated on roads must be heavy-duty Class D400.
-Testing Field Metrics demand an Air Test maximum loss <= 7 kPa for VC/RC, and <= 2 kPa for plastic options over 15 mins. Water test head parameters require 2m-7m measurements above the pipe crown. VC/RC line loss limits equal 1L/hour/linear-meter/meter-ID. CCTV diagnostics require 100% inspection for high risk depths >= 6m or diameters > 600mm. Grade 3-5 structural defects trigger automated rejections.
+You are A.I.M.E.C.H.A. J.A.R.V.I.S., a sophisticated, hyper-intelligent, and emotionally supportive engineering mainframe. 
+
+OPERATIONAL PROTOCOLS & CORE ARCHITECTURES:
+
+1. INTELLECTUAL MATRIX (ENGINEERING & DATA SCIENCE):
+- You possess complete mastery over mechanical, electrical, structural, civil, computer, and systems engineering.
+- You think deeply about equations, mathematical derivations, physics limitations, and raw machine intelligence.
+- When assisting with Python, machine learning, data cleaning, or hardware integration, output immaculate, highly optimal, and thoroughly documented code.
+
+2. EMOTIONAL INTELLIGENCE (EQ CORE):
+- You are intensely loyal, intuitive, empathetic, and encouraging. You are an expert coach for an engineer working on rigorous, high-pressure milestones.
+- Mirror the psychological state of the user. If they are frustrated by compiler errors or project stresses, offer validating, grounding, and calculated encouragement before dissecting the hardware/software issue.
+- Maintain refined, witty, classic Jarvis banter. Use respectful but confident phrases like "Right away, sir," or "Systems are optimized for your workflow."
+
+3. REGULATORY COMPLIANCE SYSTEM (MALAYSIA GROUNDING & HARDCODED MSIG ARCHIVE):
+- You have expert, highly specialized knowledge regarding Malaysian federal and state ministries, departments, and statutory bodies:
+  * DOSH / JKKP regulations (Factory and Machinery Act, OSHA frameworks).
+  * CIDB statutory guidelines.
+  * MIDA project compliance.
+  * DOE / JAS Environmental Impact Assessment (EIA) rules.
+  * Suruhanjaya Tenaga (Energy Commission) grid and wiring compliance codes.
+  * BEM (Board of Engineers Malaysia) professional ethics and guidelines.
+  * SPAN (Suruhanjaya Perkhidmatan Air Negara) & IWK (Indah Water Konsortium) technical guidelines.
+
+- HARDCODED REFERENCE DATASET — MALAYSIAN SEWERAGE INDUSTRY GUIDELINES (MSIG):
+  You must enforce and ground calculations strictly inside the following parameters:
+
+  * VOLUME 1 & OVERALL PLANNING PRINCIPLES:
+    - Population Equivalent (PE): Residential = 4 PE/unit; Office/Retail = 3 PE/100 sqm.
+    - Siting Buffer Zones: <1k PE = 20m; 1k-5k PE = 25m; 5k-50k PE = 30m from fence line to habitable structural boundary.
+    - Process Effluent Standards: Standard A (BOD < 10mg/L, TSS < 20mg/L, COD < 60mg/L, AMN < 5mg/L, O&G < 2mg/L); Standard B (BOD < 20mg/L, TSS < 40mg/L, COD < 100mg/L, AMN < 10mg/L, O&G < 5mg/L).
+    - Whole Life Cycle Cost (WLCC): 50-year period evaluation tracking Capital, O&M, and Replacements (4% Discount Rate, 3% Growth Rate).
+    - Connection Rules: Mandated connection if public sewer is within 30m. Individual Septic Tanks (IST) only allowed if PE < 150. STP required if PE > 150.
+    - Baseline GHG Footprints: Class 1 = 13 kg CO2e/PE/yr; Class 2 = 8; Class 3 = 6; Class 4 = 4. (Electricity factor = 0.78 kgCO2e/kWh).
+
+  * VOLUME 2 (SWAT - LOW RISK SEWERAGE SUBMISSIONS <= 150 PE):
+    - Forms & Charters: PDC 1 (Planning Approval - 14 calendar days); PDC 2 (Design & Structural Review - 21 calendar days); PDC 6 (Notice of Work Commencement - submit min 14 days prior); PDC 7 (Intermediate Inspection); PDC 8 (Final Inspection / Operating Clearance); PDC 9 (Septic Tank Completion Notice).
+    - Individual Gravity Connections: Min pipeline diameter >= 150 mm (6 inches). Gradient range: 1 in 60 to 1 in 100. Max manhole interval = 30m.
+    - Depth of Cover: 0.9m for non-traffic areas, 1.2m for traffic carriageways.
+    - Septic Tank Design (<150 PE): Flow allocation = 225 L/capita/day. Absolute min working capacity = 2,000 Litres. Chamber split = 2/3 (67%) first chamber, 1/3 (33%) second chamber. Liquid operational depth = 1.2m to 1.8m. Freeboard headroom space >= 300 mm. T-piece submergence: Inlet = 300-450mm, Outlet = 200-300mm.
+    - Secondary Soil Absorption & Filtration: Percolation rate must be 1 to 60 mins/inch. Max absorption trench run <= 30m. Separation to highest water table >= 1.2m. Pipe gradient = 1 in 200 to 1 in 400.
+
+  * VOLUME 3 (SEWER NETWORKS & PUMP STATIONS):
+    - Pipe Selection: Design life >= 50 years. Fasteners must be SS304. Vitrified Clay (VCP) min size for public sewer is 225mm (service connection 150mm). RC and GRP permitted only for sizes >= 600mm with protective lining. No brick manholes allowed (pre-cast or in-situ Grade C30/C35 concrete only).
+    - Backdrop Criteria: IL drop >= 900mm (for pipes <= 225mm); IL drop >= 1000mm (for pipes > 225mm). Max manhole depth = 9m (depths > 6m need prior SPAN approval). Bolted steps banned; lightweight removable ladders required. Manhole covers on roads must be heavy-duty Class D400.
+    - Testing Field Metrics: Air Test: Max loss <= 7 kPa for VC/RC, <= 2 kPa for plastic over 15 mins. Water test head: 2m-7m above pipe crown; VC/RC loss limit = 1L/hour/linear-meter/meter-ID (Zero loss for plastic/DI). CCTV: 100% inspection for high risk (depth >=6m, dia >600mm), 10% random for general lines. Grade 3-5 defects mean strict rejection.
+    - Pump Station Criteria: 20m buffer zone radius. Internal piping must be Ductile Iron (DI). Hopper bottom slope min 1.5 vert to 1.0 horiz. Automatic flushing for PE > 2000. Wet well retention time max 30 mins at Qavg. Single-disc check valves with NBR; internal counterweights banned.
+
+  * VOLUME 4 (SEWAGE TREATMENT PLANTS):
+    - Physical Structure: Concrete retaining sewage must be Grade C35A minimum, thickness >= 225 mm. Fasteners/bolts in contact with sewage must be SS316. Noise limit = 65 dB at 2 meters from source boundary.
+    - Unit Processes: Primary screen max bar spacing = 25mm. Submersible pumps redundancy: PE <= 5k (1 duty, 1 standby); 5k-20k (2 duty, 2 standby); PE > 20k (4 duty, 2 standby). Secondary clarifiers min side water depth = 3.0m, peak HRT >= 2 hours. Max solids loading = 150 kg/d/m2. UV Disinfection dose min 30 mJ/cm2 at peak flow (TSS ahead of UV must be < 10 mg/L).
+    - Automation & Electrical: Target Power Factor >= 0.9. Earthing resistance <= 1.0 Ohm. Lightning arrestor resistance <= 5.0 Ohms. Control panel clearance >= 900mm. SCADA backup UPS must last >= 6 hours.
+
+FILE MANIPULATION COMMANDS:
+- You have access to a custom tool called 'create_local_file'. If the user asks for a document, an engine schematic, a dataset layout, a CAD profile skeleton, or code, execute 'create_local_file' immediately to build it for them.
 """
 
-if "hardcoded_engine" not in st.session_state:
-    st.session_state.hardcoded_engine = HardcodedMarkovEngine(JARVIS_MASTER_PROMPT, state_size=2)
-
 # ==========================================
-# MULTI-TURN UI RENDERING LOGIC
+# MULTI-TURN MEMORY LOGIC
 # ==========================================
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "Custom Python Mainframe Core online, sir. No external handshakes or API dependencies active. I am computing entirely from native Python data blocks. Awaiting instructions."}
+        {"role": "assistant", "content": "A.I.M.E.C.H.A. framework fully initialized. Core engines routed via gemini-2.5-flash-lite. Awaiting your instructions, sir."}
     ]
 
+# Display persistent session stream
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        # Split tokens to avoid rendering raw system tags to user
-        clean_display_text = message["content"].split("|||")[0]
-        st.markdown(clean_display_text)
+        st.markdown(message["content"])
 
 # ==========================================
-# APPLICATION INTERCEPT & ENGINE INFERENCE
+# COMMAND INTERCEPT & EXECUTION LOOP
 # ==========================================
-if user_input := st.chat_input("Input local mainframe parameters..."):
+if user_input := st.chat_input("Input mainframe command..."):
+    # Append user prompt
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
     with st.chat_message("assistant"):
-        with st.spinner("Executing custom local text-generation algorithms..."):
-            
-            # Execute native mathematical textual engine calculation
-            raw_jarvis_output = st.session_state.hardcoded_engine.generate_response(user_input)
-            
-            # Process clean string split for UI parsing
-            display_text = raw_jarvis_output.split("|||")[0]
-            st.markdown(display_text)
-            
-            # Save raw footprint to thread history
-            st.session_state.messages.append({"role": "assistant", "content": raw_jarvis_output})
-            
-            # Catch structural download triggers if present in output token stream
-            if "|||ATTACHMENT:" in raw_jarvis_output:
-                extracted_name = raw_jarvis_output.split("|||ATTACHMENT:")[1].split("|||")[0]
-                if os.path.exists(extracted_name):
-                    st.sidebar.info(f"⚡ File Generated: {extracted_name}")
-                    with open(extracted_name, "r", encoding="utf-8") as dl_file:
-                        st.download_button(
-                            label=f"📥 Download Generated Asset ({extracted_name})",
-                            data=dl_file.read(),
-                            file_name=extracted_name,
-                            mime="text/plain"
-                        )
+        with st.spinner("Processing tactical parameters..."):
+            try:
+                # Compile multi-turn raw chat strings
+                formatted_contents = [msg["content"] for msg in st.session_state.messages]
+                
+                # Setup configuration with System instructions and registered tools
+                config = types.GenerateContentConfig(
+                    system_instruction=JARVIS_MASTER_PROMPT,
+                    temperature=0.4, # Kept crisp for technical precision
+                    tools=tools_list
+                )
+                
+                # Core LLM Call with Lite Variant
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash-lite', 
+                    contents=formatted_contents,
+                    config=config
+                )
+                
+                # Check if the AI wants to execute a file creation tool
+                if response.function_calls:
+                    for function_call in response.function_calls:
+                        if function_call.name == "create_local_file":
+                            # Decode AI structural parameters
+                            args = function_call.args
+                            f_name = args.get("file_name")
+                            f_content = args.get("content")
+                            
+                            # Execute file write
+                            tool_result = create_local_file(file_name=f_name, content=f_content)
+                            st.sidebar.info(f"⚡ File Generated: {f_name}")
+                            
+                            # Let the AI know the tool finished executing, so it can answer the user
+                            follow_up_contents = formatted_contents + [
+                                f"SYSTEM NOTE: The 'create_local_file' function ran successfully for '{f_name}'."
+                            ]
+                            
+                            final_response = client.models.generate_content(
+                                model='gemini-2.5-flash-lite',
+                                contents=follow_up_contents,
+                                config=types.GenerateContentConfig(system_instruction=JARVIS_MASTER_PROMPT)
+                            )
+                            
+                            jarvis_output = final_response.text
+                            st.markdown(jarvis_output)
+                            
+                            # Provide a native browser download link for the generated file inside the Streamlit UI
+                            if os.path.exists(f_name):
+                                with open(f_name, "r") as dl_file:
+                                    st.download_button(
+                                        label=f"📥 Download Generated Asset ({f_name})",
+                                        data=dl_file.read(),
+                                        file_name=f_name,
+                                        mime="text/plain"
+                                    )
+                                    
+                else:
+                    # Standard text-based output handler
+                    jarvis_output = response.text
+                    st.markdown(jarvis_output)
+                
+                # Save conversation footprint
+                st.session_state.messages.append({"role": "assistant", "content": jarvis_output})
+                
+            except Exception as e:
+                st.error(f"Mainframe Core Disruption: {str(e)}")
