@@ -29,13 +29,18 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-header_col1, header_col2 = st.columns([1, 10])
+# ==========================================
+# HEADER WITH A.I.M.E.C.H.A. LOGO
+# ==========================================
+header_col1, header_col2 = st.columns([1, 12])
 
 with header_col1:
-    if os.path.exists("aimecha_logo.png"):
-        st.image("aimecha_logo.png", width=80)
+    # Using the exact filename from your repository screenshot
+    logo_path = "AIMeCHA Logo.png"
+    if os.path.exists(logo_path):
+        st.image(logo_path, width=120)
     else:
-        st.warning("⚠️ Logo file 'aimecha_logo.png' not found in root directory.")
+        st.error("Logo file not found. Ensure 'AIMeCHA Logo.png' is in the root directory.")
 
 with header_col2:
     st.markdown("<h1>J.A.R.V.I.S. AI Engine</h1>", unsafe_allow_html=True)
