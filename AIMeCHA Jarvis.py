@@ -4,6 +4,7 @@ import base64
 import streamlit as st
 from google import genai
 from google.genai import types
+from google.genai.errors import APIError
 
 # ==========================================
 # PAGE CONFIGURATION & STARK INDUSTRIES UI
@@ -30,16 +31,34 @@ st.title("🤖 A.I.M.E.C.H.A. J.A.R.V.I.S. Core Operating System")
 st.sidebar.title("⚙️ System Status")
 st.sidebar.success("Cognitive Core: ONLINE")
 st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
-st.sidebar.warning("Engine: gemini-2.5-flash-lite")
 
-# API Initialization Safeguard
-api_key = os.environ.get("GEMINI_API_KEY")
-if not api_key:
-    st.sidebar.error("GEMINI_API_KEY missing from environment configurations.")
-    st.warning("Awaiting secure API authorization handshake. Please set your environment variables.")
+# ==========================================
+# MULTI-KEY POOL VERIFICATION & MANAGEMENT
+# ==========================================
+if "GEMINI_API_POOL" not in st.secrets:
+    st.sidebar.error("GEMINI_API_POOL missing from Secrets configuration.")
+    st.warning("Please pass your jarvis-1 to jarvis-5 array into the Streamlit Secret section box.")
     st.stop()
 
-client = genai.Client(api_key=api_key)
+# Track exhausted keys persistently across session states
+if "exhausted_keys" not in st.session_state:
+    st.session_state.exhausted_keys = set()
+
+api_key_pool = st.secrets["GEMINI_API_POOL"]
+available_keys = [k for k in api_key_pool if k not in st.session_state.exhausted_keys]
+
+# Display system status metrics in the sidebar
+total_keys = len(api_key_pool)
+dead_keys = len(st.session_state.exhausted_keys)
+active_index = dead_keys + 1
+
+if not available_keys:
+    st.sidebar.error("Engine status: ALL CORES EXHAUSTED")
+    st.error("🚨 CRITICAL METRIC EXHAUSTION: All 5 Jarvis core key tokens have been completely used up today.")
+    st.stop()
+else:
+    st.sidebar.warning(f"Engine Core: Jarvis [{active_index}/{total_keys}] Active")
+    st.sidebar.info(f"Runway: {total_keys - dead_keys} pristine fallback cores left.")
 
 # ==========================================
 # FEATURE 3: LOCAL TOOLS / FILE GENERATOR
@@ -130,7 +149,7 @@ FILE MANIPULATION COMMANDS:
 # ==========================================
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "A.I.M.E.C.H.A. framework fully initialized. Core engines routed via gemini-2.5-flash-lite. Awaiting your instructions, sir."}
+        {"role": "assistant", "content": "A.I.M.E.C.H.A. framework fully initialized. Multi-key automated backup array online. Awaiting your instructions, sir."}
     ]
 
 # Display persistent session stream
@@ -139,78 +158,115 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # ==========================================
-# COMMAND INTERCEPT & EXECUTION LOOP
+# COMMAND INTERCEPT & AUTOMATED ROUTING LOOP
 # ==========================================
 if user_input := st.chat_input("Input mainframe command..."):
-    # Append user prompt
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
     with st.chat_message("assistant"):
-        with st.spinner("Processing tactical parameters..."):
-            try:
-                # Compile multi-turn raw chat strings
-                formatted_contents = [msg["content"] for msg in st.session_state.messages]
-                
-                # Setup configuration with System instructions and registered tools
-                config = types.GenerateContentConfig(
-                    system_instruction=JARVIS_MASTER_PROMPT,
-                    temperature=0.4, # Kept crisp for technical precision
-                    tools=tools_list
-                )
-                
-                # Core LLM Call with Lite Variant
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash-lite', 
-                    contents=formatted_contents,
-                    config=config
-                )
+        with st.spinner("Processing tactical parameters via available cores..."):
+            
+            # Compile multi-turn raw chat strings
+            formatted_contents = [msg["content"] for msg in st.session_state.messages]
+            
+            # Re-verify remaining operational keys at the moment of request execution
+            available_keys = [k for k in st.secrets["GEMINI_API_POOL"] if k not in st.session_state.exhausted_keys]
+            
+            if not available_keys:
+                st.error("🚨 ALL CORES OFFLINE: System quota depleted. Please reload pool settings.")
+                st.stop()
+            
+            response = None
+            successful_key = None
+            
+            # AUTOMATIC RUNTIME OVERRIDE SEQUENCING
+            for active_key in available_keys:
+                try:
+                    # Form client handshake using the current targeted array string
+                    client = genai.Client(api_key=active_key)
+                    
+                    config = types.GenerateContentConfig(
+                        system_instruction=JARVIS_MASTER_PROMPT,
+                        temperature=0.4,
+                        tools=tools_list
+                    )
+                    
+                    # Execute generation call
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash-lite', 
+                        contents=formatted_contents,
+                        config=config
+                    )
+                    
+                    # If execution succeeds without triggering an error block, lock the key and break
+                    successful_key = active_key
+                    break
+                    
+                except Exception as e:
+                    error_str = str(e)
+                    # Catch structural resource limitations or HTTP 429 exceptions explicitly
+                    if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                        st.session_state.exhausted_keys.add(active_key)
+                        st.sidebar.warning(f"Jarvis Core [{len(st.session_state.exhausted_keys)}] depleted. Switching link...")
+                        continue  # Let loop move to next available token block automatically
+                    else:
+                        # Drop general code bugs, missing libraries or config faults straight down
+                        st.error(f"Mainframe Core Disruption: {error_str}")
+                        st.stop()
+            
+            # Ensure a valid response object was returned before proceeding to extract metrics
+            if response:
+                jarvis_output = ""
                 
                 # Check if the AI wants to execute a file creation tool
                 if response.function_calls:
                     for function_call in response.function_calls:
                         if function_call.name == "create_local_file":
-                            # Decode AI structural parameters
                             args = function_call.args
                             f_name = args.get("file_name")
                             f_content = args.get("content")
                             
-                            # Execute file write
+                            # Execute the local tool execution script
                             tool_result = create_local_file(file_name=f_name, content=f_content)
                             st.sidebar.info(f"⚡ File Generated: {f_name}")
                             
-                            # Let the AI know the tool finished executing, so it can answer the user
+                            # Notify the model using the same successful key channel to maintain state consistency
                             follow_up_contents = formatted_contents + [
                                 f"SYSTEM NOTE: The 'create_local_file' function ran successfully for '{f_name}'."
                             ]
                             
-                            final_response = client.models.generate_content(
-                                model='gemini-2.5-flash-lite',
-                                contents=follow_up_contents,
-                                config=types.GenerateContentConfig(system_instruction=JARVIS_MASTER_PROMPT)
-                            )
+                            try:
+                                client = genai.Client(api_key=successful_key)
+                                final_response = client.models.generate_content(
+                                    model='gemini-2.5-flash-lite',
+                                    contents=follow_up_contents,
+                                    config=types.GenerateContentConfig(system_instruction=JARVIS_MASTER_PROMPT)
+                                )
+                                jarvis_output = final_response.text
+                            except Exception as follow_up_err:
+                                st.error(f"Follow-up Handshake Disruption: {str(follow_up_err)}")
+                                st.stop()
                             
-                            jarvis_output = final_response.text
                             st.markdown(jarvis_output)
                             
-                            # Provide a native browser download link for the generated file inside the Streamlit UI
+                            # Provide download utility
                             if os.path.exists(f_name):
-                                with open(f_name, "r") as dl_file:
+                                with open(f_name, "r", encoding="utf-8") as dl_file:
                                     st.download_button(
                                         label=f"📥 Download Generated Asset ({f_name})",
                                         data=dl_file.read(),
                                         file_name=f_name,
                                         mime="text/plain"
                                     )
-                                    
                 else:
-                    # Standard text-based output handler
+                    # Standard text response output pipeline
                     jarvis_output = response.text
                     st.markdown(jarvis_output)
                 
-                # Save conversation footprint
-                st.session_state.messages.append({"role": "assistant", "content": jarvis_output})
-                
-            except Exception as e:
-                st.error(f"Mainframe Core Disruption: {str(e)}")
+                # Append finalized assistant payload onto historical thread tracker array
+                if jarvis_output:
+                    st.session_state.messages.append({"role": "assistant", "content": jarvis_output})
+                    # Force page state metrics refresh to accurately show updated key counts in sidebar
+                    st.rerun()
