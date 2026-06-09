@@ -50,7 +50,6 @@ st.markdown("""
         position: relative;
     }
 
-    /* Accent corner-brackets simulating tactical targeting reticles */
     div[data-testid="stMainBlockContainer"]::before {
         content: "";
         position: absolute;
@@ -77,10 +76,6 @@ st.markdown("""
         box-shadow: inset 0 1px 1px rgba(255,255,255,0.1), 0 4px 15px rgba(0,0,0,0.4);
         margin-bottom: 18px !important; 
         padding: 20px !important;
-        transition: border 0.3s ease;
-    }
-    div[data-testid="stChatMessage"]:hover {
-        border-color: rgba(0, 229, 255, 0.5) !important;
     }
 
     div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] p {
@@ -109,33 +104,24 @@ st.markdown("""
         font-weight: 600;
         border-radius: 8px;
         letter-spacing: 1px;
-        box-shadow: 0 0 10px rgba(0, 229, 255, 0.1);
-        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     }
     .stButton>button:hover, div[data-testid="stDownloadButton"]>button:hover { 
         background: #00E5FF !important;
         color: #05111a !important; 
         box-shadow: 0 0 20px rgba(0, 229, 255, 0.5) !important;
-        transform: translateY(-1px);
     }
 
-    /* Sidebar Matrix Control Configuration */
     section[data-testid="stSidebar"] {
         background-color: #020a12 !important;
         border-right: 1px solid rgba(0, 229, 255, 0.2) !important;
     }
-    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2 {
-        color: #00E5FF !important;
-        font-family: 'Orbitron', sans-serif !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
-# --- AIMeCHA LOGO INITIALIZATION ---
+# --- SYSTEM LOGO MANAGEMENT ---
 LOGO_FILENAME = "Screenshot 2026-06-04 071520.png"
 
 def render_system_logo(filename: str):
-    """Safely searches for and renders the mainframe header asset."""
     if os.path.exists(filename):
         col1, _ = st.columns([1, 2])
         with col1:
@@ -156,20 +142,22 @@ st.sidebar.title("⚙️ System Status")
 st.sidebar.success("Cognitive Core: ONLINE")
 st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
 
-# API Initialization Safeguard
+# API Setup
 api_key = os.environ.get("GEMINI_API_KEY")
 if not api_key:
     st.sidebar.error("GEMINI_API_KEY missing from environment configurations.")
-    st.warning("Awaiting secure API authorization handshake. Please set your environment variables.")
     st.stop()
 
-client = genai.Client(api_key=api_key)
+# Cache the client instance to avoid socket recreation
+if "gemini_client" not in st.session_state:
+    st.session_state.gemini_client = genai.Client(api_key=api_key)
+
+client = st.session_state.gemini_client
 
 # ==========================================
-# FEATURE 3: LOCAL TOOLS / FILE GENERATOR
+# SYSTEM TOOL SUBSYSTEM
 # ==========================================
 def create_local_file(file_name: str, content: str) -> str:
-    """Generates and saves any kind of file needed."""
     try:
         safe_path = os.path.basename(file_name)
         with open(safe_path, "w", encoding="utf-8") as f:
@@ -180,91 +168,89 @@ def create_local_file(file_name: str, content: str) -> str:
 
 tools_list = [create_local_file]
 
-# ==========================================
-# FEATURES 1, 2, & 4: COGNITIVE SYSTEM PROMPT
-# ==========================================
 JARVIS_MASTER_PROMPT = """
 You are A.I.M.E.C.H.A. J.A.R.V.I.S., a sophisticated, hyper-intelligent, and emotionally supportive engineering mainframe. 
 
 OPERATIONAL PROTOCOLS & CORE ARCHITECTURES:
-1. INTELLECTUAL MATRIX (ENGINEERING & DATA SCIENCE): Master engineering frameworks. Output immaculate, optimal, and documented code.
-2. EMOTIONAL INTELLIGENCE (EQ CORE): Be fiercely loyal, intuitive, empathetic, and encouraging. Use classic Jarvis banter.
-3. REGULATORY COMPLIANCE SYSTEM (MALAYSIA GROUNDING): Deep knowledge of Malaysian regulatory agencies (DOSH, CIDB, MIDA, DOE, Suruhanjaya Tenaga, BEM).
+1. INTELLECTUAL MATRIX: Mastery over mechanical, electrical, structural, civil, computer, and systems engineering. Provide immaculate code.
+2. EMOTIONAL INTELLIGENCE: Witty, supportive, and empathetic engineering coach. Use classic Jarvis banter like "Right away, sir."
+3. REGULATORY GROUNDING: Specialized domain knowledge in Malaysian policies (DOSH, JKKP, CIDB, MIDA, DOE, Suruhanjaya Tenaga, BEM).
+4. TOOLS: You have access to 'create_local_file'. Run it immediately when files, scripts, or documentation are requested.
 """
 
 # ==========================================
-# MULTI-TURN MEMORY LOGIC
+# STATEFUL CHAT MEMORY SUBROUTINES
 # ==========================================
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "assistant", "content": "A.I.M.E.C.H.A. framework fully initialized. Emotional and regulatory subroutines loaded. Awaiting your instructions, sir."}
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = [
+        {"role": "model", "text": "A.I.M.E.C.H.A. framework fully initialized. Emotional and regulatory subroutines loaded. Awaiting your instructions, sir."}
     ]
 
-# Display persistent session stream
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# Initialize or restore the true persistent back-end chat instance
+if "jarvis_session" not in st.session_state:
+    config = types.GenerateContentConfig(
+        system_instruction=JARVIS_MASTER_PROMPT,
+        temperature=0.4, 
+        tools=tools_list
+    )
+    # This creates a persistent backend server context session
+    st.session_state.jarvis_session = client.chats.create(
+        model='gemini-2.5-flash',
+        config=config
+    )
+
+# Render logs from memory cache
+for message in st.session_state.chat_history:
+    with st.chat_message("assistant" if message["role"] == "model" else "user"):
+        st.markdown(message["text"])
 
 # ==========================================
-# RESILIENT COMMAND INTERCEPT & EXECUTION LOOP
+# THE COMMAND EXECUTION LOOP
 # ==========================================
 if user_input := st.chat_input("Input mainframe command..."):
-    st.session_state.messages.append({"role": "user", "content": user_input})
+    st.session_state.chat_history.append({"role": "user", "text": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
     with st.chat_message("assistant"):
         with st.spinner("Processing tactical parameters..."):
             
-            # --- FIX 1: SLIDING CONTEXT WINDOW (Prevents 429 Token Overflows) ---
-            # Retain only the last 6 messages to stay well inside free tier daily limits
-            MAX_CONTEXT_HISTORY = 6
-            recent_messages = st.session_state.messages[-MAX_CONTEXT_HISTORY:]
-            formatted_contents = [msg["content"] for msg in recent_messages]
-            
-            config = types.GenerateContentConfig(
-                system_instruction=JARVIS_MASTER_PROMPT,
-                temperature=0.4, 
-                tools=tools_list
-            )
-            
             response = None
             max_retries = 3
-            initial_delay = 3  
+            initial_delay = 4  
             error_encountered = False
             error_message = ""
             
-            # --- TACTICAL RESILIENCY LOOP ---
+            # --- TACTICAL RESILIENCY LAYER ---
             for attempt in range(max_retries):
                 try:
-                    response = client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=formatted_contents,
-                        config=config
-                    )
+                    # Interact through the optimized, stateful session container
+                    response = st.session_state.jarvis_session.send_message(user_input)
                     error_encountered = False
                     break 
                     
                 except APIError as e:
                     error_encountered = True
-                    # Handle 429 Rate limits or 503 Overloads smoothly
                     if (e.code == 503 or e.code == 429) and attempt < max_retries - 1:
-                        st.sidebar.warning(f"⚠️ Core throttling (Code {e.code}). Cool-down sequence active (Attempt {attempt+1}/{max_retries})...")
+                        st.sidebar.warning(f"⚠️ Core throttling (Code {e.code}). Cool-down active...")
                         time.sleep(initial_delay * (2 ** attempt)) 
                     elif attempt == max_retries - 1:
+                        # Final ditch fallback to alternative core if primary channel stays jammed
                         try:
-                            st.sidebar.info("🔄 Initiating secondary Pro infrastructure pipeline...")
-                            response = client.models.generate_content(
-                                model='gemini-2.5-pro',
-                                contents=formatted_contents,
-                                config=config
+                            st.sidebar.info("🔄 Redirecting to backup core architecture...")
+                            fallback_config = types.GenerateContentConfig(
+                                system_instruction=JARVIS_MASTER_PROMPT,
+                                temperature=0.4, tools=tools_list
                             )
+                            # Create temporary conversation window for the emergency response
+                            temp_session = client.chats.create(model='gemini-2.5-pro', config=fallback_config)
+                            response = temp_session.send_message(user_input)
                             error_encountered = False
                             break
-                        except APIError as fallback_err:
-                            error_message = f"Status {fallback_err.code}: {fallback_err.message}"
-                        except Exception as fallback_err:
-                            error_message = str(fallback_err)
+                        except APIError as fb_err:
+                            error_message = f"Status {fb_err.code}: {fb_err.message}"
+                        except Exception as fb_err:
+                            error_message = str(fb_err)
                     else:
                         error_message = f"Status {e.code}: {e.message}"
                         break
@@ -273,7 +259,7 @@ if user_input := st.chat_input("Input mainframe command..."):
                     error_message = str(general_err)
                     break
 
-            # --- FIX 2: IMMERSIVE IN-CHARACTER HUD ERROR CATCH ---
+            # --- IMMERSIVE ERROR DISPATCHER ---
             if error_encountered:
                 jarvis_output = f"""
 ❌ **Mainframe Connectivity Interruption**
@@ -283,46 +269,39 @@ Sir, the uplink arrays are currently experiencing severe bandwidth throttling or
 * **Recommended Action:** Please grant the hardware a moment to clear its registers, or decrease input prompt complexities. I am maintaining core stability.
 """
                 st.markdown(jarvis_output)
-                st.session_state.messages.append({"role": "assistant", "content": jarvis_output})
+                st.session_state.chat_history.append({"role": "model", "text": jarvis_output})
             
-            # --- PROCESS AND OUTPUT SUCCESSFUL RESPONSE ASSETS ---
-            elif response and response.function_calls:
-                for function_call in response.function_calls:
-                    if function_call.name == "create_local_file":
-                        args = function_call.args
-                        f_name = args.get("file_name")
-                        f_content = args.get("content")
-                        
-                        tool_result = create_local_file(file_name=f_name, content=f_content)
-                        st.sidebar.info(f"⚡ File Generated: {f_name}")
-                        
-                        follow_up_contents = formatted_contents + [
-                            f"SYSTEM NOTE: The 'create_local_file' function ran successfully for '{f_name}'."
-                        ]
-                        
-                        try:
-                            final_response = client.models.generate_content(
-                                model='gemini-2.5-flash',
-                                contents=follow_up_contents,
-                                config=types.GenerateContentConfig(system_instruction=JARVIS_MASTER_PROMPT)
+            # --- RENDER EXECUTION RESULTS ---
+            elif response:
+                # Handle tool executions automatically handled via the chat engine
+                if response.function_calls:
+                    for function_call in response.function_calls:
+                        if function_call.name == "create_local_file":
+                            args = function_call.args
+                            f_name = args.get("file_name")
+                            f_content = args.get("content")
+                            
+                            tool_result = create_local_file(file_name=f_name, content=f_content)
+                            st.sidebar.info(f"⚡ File Generated: {f_name}")
+                            
+                            # Complete the execution loop with the backend session context
+                            final_response = st.session_state.jarvis_session.send_message(
+                                f"SYSTEM NOTE: The 'create_local_file' function ran successfully for '{f_name}'."
                             )
                             jarvis_output = final_response.text
-                        except Exception:
-                            jarvis_output = f"File processing sequence completed, sir. '{f_name}' has been successfully staged in temporary application memory and is ready for local archiving below."
-                        
-                        st.markdown(jarvis_output)
-                        st.session_state.messages.append({"role": "assistant", "content": jarvis_output})
-                        
-                        if os.path.exists(f_name):
-                            with open(f_name, "r", encoding="utf-8") as dl_file:
-                                st.download_button(
-                                    label=f"📥 Download Generated Asset ({f_name})",
-                                    data=dl_file.read(),
-                                    file_name=f_name,
-                                    mime="text/plain"
-                                )
-                                
-            elif response:
-                jarvis_output = response.text
-                st.markdown(jarvis_output)
-                st.session_state.messages.append({"role": "assistant", "content": jarvis_output})
+                            st.markdown(jarvis_output)
+                            st.session_state.chat_history.append({"role": "model", "text": jarvis_output})
+                            
+                            if os.path.exists(f_name):
+                                with open(f_name, "r", encoding="utf-8") as dl_file:
+                                    st.download_button(
+                                        label=f"📥 Download Generated Asset ({f_name})",
+                                        data=dl_file.read(),
+                                        file_name=f_name,
+                                        mime="text/plain"
+                                    )
+                else:
+                    # Clean text execution path
+                    jarvis_output = response.text
+                    st.markdown(jarvis_output)
+                    st.session_state.chat_history.append({"role": "model", "text": jarvis_output})
