@@ -73,7 +73,7 @@ with header_col1:
     if os.path.exists(logo_path):
         # Everything here must be indented 4 spaces relative to 'if'
         st.markdown('<div class="logo-glow">', unsafe_allow_html=True)
-        st.image(logo_path, width=350)
+        st.image(logo_path, width=700)
         st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.error("Logo file missing.")
