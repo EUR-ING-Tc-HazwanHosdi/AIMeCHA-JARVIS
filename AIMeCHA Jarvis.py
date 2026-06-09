@@ -193,11 +193,27 @@ if "jarvis_session" not in st.session_state:
         temperature=0.4, 
         tools=tools_list
     )
-    # This creates a persistent backend server context session
+    # Using 1.5-flash as the fresh base model to work past your current 2.5 quota limit
     st.session_state.jarvis_session = client.chats.create(
-        model='gemini-2.5-flash',
+        model='gemini-1.5-flash',
         config=config
     )
+
+# --- SIDEBAR MANUAL QUOTA RESET / MEMORY WIPE BUTTON ---
+if st.sidebar.button("🧹 Clear Mainframe Memory"):
+    st.session_state.chat_history = [
+        {"role": "model", "text": "Memory registers flushed cleanly, sir. Server side states initialized to zero token metrics."}
+    ]
+    config = types.GenerateContentConfig(
+        system_instruction=JARVIS_MASTER_PROMPT,
+        temperature=0.4, 
+        tools=tools_list
+    )
+    st.session_state.jarvis_session = client.chats.create(
+        model='gemini-1.5-flash',
+        config=config
+    )
+    st.rerun()
 
 # Render logs from memory cache
 for message in st.session_state.chat_history:
@@ -243,7 +259,7 @@ if user_input := st.chat_input("Input mainframe command..."):
                                 temperature=0.4, tools=tools_list
                             )
                             # Create temporary conversation window for the emergency response
-                            temp_session = client.chats.create(model='gemini-2.5-pro', config=fallback_config)
+                            temp_session = client.chats.create(model='gemini-1.5-pro', config=fallback_config)
                             response = temp_session.send_message(user_input)
                             error_encountered = False
                             break
@@ -266,7 +282,7 @@ if user_input := st.chat_input("Input mainframe command..."):
 
 Sir, the uplink arrays are currently experiencing severe bandwidth throttling or quota saturation from the central satellite link. 
 * **Diagnostic Details:** `{error_message}`
-* **Recommended Action:** Please grant the hardware a moment to clear its registers, or decrease input prompt complexities. I am maintaining core stability.
+* **Recommended Action:** Please hit the **Clear Mainframe Memory** button on the sidebar layout to drop our active token footprint weight.
 """
                 st.markdown(jarvis_output)
                 st.session_state.chat_history.append({"role": "model", "text": jarvis_output})
