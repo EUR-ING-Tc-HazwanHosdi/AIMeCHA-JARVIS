@@ -26,6 +26,22 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- AIMeCHA LOGO INITIALIZATION ---
+LOGO_FILENAME = "Screenshot 2026-06-04 071520.png"
+
+def render_system_logo(filename: str):
+    """Safely searches for and renders the mainframe header asset."""
+    if os.path.exists(filename):
+        # Create a bounded layout column to maintain professional asset dimensions
+        col1, _ = st.columns([1, 2])
+        with col1:
+            st.image(filename, width=380)
+    else:
+        st.sidebar.warning(f"System Asset '{filename}' not detected in execution path.")
+
+# Execute asset layout placement
+render_system_logo(LOGO_FILENAME)
+
 st.title("🤖 A.I.M.E.C.H.A. J.A.R.V.I.S. Core Operating System")
 st.sidebar.title("⚙️ System Status")
 st.sidebar.success("Cognitive Core: ONLINE")
