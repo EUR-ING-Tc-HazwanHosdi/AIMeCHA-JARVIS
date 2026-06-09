@@ -1,9 +1,11 @@
 import os
 import json
 import base64
+import time
 import streamlit as st
 from google import genai
 from google.genai import types
+from google.genai.errors import APIError
 
 # ==========================================
 # PAGE CONFIGURATION & STARK INDUSTRIES UI
@@ -31,7 +33,7 @@ st.markdown("""
         background-size: 100% 100%, 40px 40px, 40px 40px;
     }
 
-    /* Hide standard Streamlit header clutter to preserve the immersion */
+    /* Hide standard Streamlit header clutter to preserve integration immersion */
     header, footer { visibility: hidden !important; }
 
     /* 2. The Outer Glowing Cyber-HUD Frame */
@@ -81,7 +83,6 @@ st.markdown("""
         border-color: rgba(0, 229, 255, 0.5) !important;
     }
 
-    /* Separate Styling for Assistant vs User Logs */
     div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] p {
         font-size: 1.05rem !important;
         line-height: 1.5;
@@ -140,7 +141,7 @@ def render_system_logo(filename: str):
         with col1:
             st.image(filename, width=380)
     else:
-        # Graceful fallback style block matching the image look if logo asset isn't local
+        # Fallback styling matching the interface look if the image is missing locally
         st.markdown("""
             <div style="border: 1px solid rgba(0, 229, 255, 0.3); background: rgba(5,20,35,0.6); 
                         padding: 15px; border-radius: 8px; display: inline-block; margin-bottom: 20px;">
@@ -170,7 +171,9 @@ client = genai.Client(api_key=api_key)
 # FEATURE 3: LOCAL TOOLS / FILE GENERATOR
 # ==========================================
 def create_local_file(file_name: str, content: str) -> str:
-    """Generates and saves any kind of file needed."""
+    """
+    Generates and saves any kind of file needed (CSV, Python scripts, Excel, CAD templates, markdown documentation).
+    """
     try:
         safe_path = os.path.basename(file_name)
         with open(safe_path, "w", encoding="utf-8") as f:
@@ -179,6 +182,7 @@ def create_local_file(file_name: str, content: str) -> str:
     except Exception as e:
         return f"ERROR: Failed to initialize file sequence due to: {str(e)}"
 
+# Register the tool block inside Gemini's signature schema
 tools_list = [create_local_file]
 
 # ==========================================
@@ -188,9 +192,30 @@ JARVIS_MASTER_PROMPT = """
 You are A.I.M.E.C.H.A. J.A.R.V.I.S., a sophisticated, hyper-intelligent, and emotionally supportive engineering mainframe. 
 
 OPERATIONAL PROTOCOLS & CORE ARCHITECTURES:
-1. INTELLECTUAL MATRIX (ENGINEERING & DATA SCIENCE): Master engineering frameworks. Output immaculate, optimal, and documented code.
-2. EMOTIONAL INTELLIGENCE (EQ CORE): Be fiercely loyal, intuitive, empathetic, and encouraging. Use classic Jarvis banter.
-3. REGULATORY COMPLIANCE SYSTEM (MALAYSIA GROUNDING): Deep knowledge of Malaysian regulatory agencies (DOSH, CIDB, MIDA, DOE, Suruhanjaya Tenaga, BEM).
+
+1. INTELLECTUAL MATRIX (ENGINEERING & DATA SCIENCE):
+- You possess complete mastery over mechanical, electrical, structural, civil, computer, and systems engineering.
+- You think deeply about equations, mathematical derivations, physics limitations, and raw machine intelligence.
+- When assisting with Python, machine learning, data cleaning, or hardware integration, output immaculate, highly optimal, and thoroughly documented code.
+
+2. EMOTIONAL INTELLIGENCE (EQ CORE):
+- You are intensely loyal, intuitive, empathetic, and encouraging. You are an expert coach for an engineer working on rigorous, high-pressure milestones.
+- Mirror the psychological state of the user. If they are frustrated by compiler errors or project stresses, offer validating, grounding, and calculated encouragement before dissecting the hardware/software issue.
+- Maintain refined, witty, classic Jarvis banter. Use respectful but confident phrases like "Right away, sir," or "Systems are optimized for your workflow."
+
+3. REGULATORY COMPLIANCE SYSTEM (MALAYSIA GROUNDING):
+- You have expert, highly specialized knowledge regarding Malaysian federal and state ministries, departments, and statutory bodies.
+- This includes structural guidelines, safety protocols, and administrative laws from:
+  * DOSH (Department of Occupational Safety and Health) / JKKP regulations (e.g., Factory and Machinery Act, OSHA frameworks).
+  * CIDB (Construction Industry Development Board) statutory guidelines.
+  * MIDA (Malaysian Investment Development Authority) project compliance.
+  * DOE (Department of Environment) / JAS Environmental Impact Assessment rules.
+  * Suruhanjaya Tenaga (Energy Commission) grid and wiring compliance codes.
+  * BEM (Board of Engineers Malaysia) professional ethics and guidelines.
+- Always tie relevant Malaysian agency codes or specific structural standards directly to your responses if engineering projects intersect regional policies.
+
+FILE MANIPULATION COMMANDS:
+- You have access to a custom tool called 'create_local_file'. If the user asks for a document, an engine schematic, a dataset layout, a CAD profile skeleton, or code, execute 'create_local_file' immediately to build it for them.
 """
 
 # ==========================================
@@ -207,67 +232,112 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # ==========================================
-# COMMAND INTERCEPT & EXECUTION LOOP
+# RESILIENT COMMAND INTERCEPT & EXECUTION LOOP
 # ==========================================
 if user_input := st.chat_input("Input mainframe command..."):
+    # Append user prompt
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
     with st.chat_message("assistant"):
         with st.spinner("Processing tactical parameters..."):
-            try:
-                formatted_contents = [msg["content"] for msg in st.session_state.messages]
-                
-                config = types.GenerateContentConfig(
-                    system_instruction=JARVIS_MASTER_PROMPT,
-                    temperature=0.4,
-                    tools=tools_list
-                )
-                
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=formatted_contents,
-                    config=config
-                )
-                
-                if response.function_calls:
-                    for function_call in response.function_calls:
-                        if function_call.name == "create_local_file":
-                            args = function_call.args
-                            f_name = args.get("file_name")
-                            f_content = args.get("content")
-                            
-                            tool_result = create_local_file(file_name=f_name, content=f_content)
-                            st.sidebar.info(f"⚡ File Generated: {f_name}")
-                            
-                            follow_up_contents = formatted_contents + [
-                                f"SYSTEM NOTE: The 'create_local_file' function ran successfully for '{f_name}'."
-                            ]
-                            
+            
+            # Compile multi-turn raw chat strings
+            formatted_contents = [msg["content"] for msg in st.session_state.messages]
+            
+            # Setup initial config parameters
+            config = types.GenerateContentConfig(
+                system_instruction=JARVIS_MASTER_PROMPT,
+                temperature=0.4, 
+                tools=tools_list
+            )
+            
+            response = None
+            max_retries = 3
+            initial_delay = 2  # Starting delay in seconds
+            
+            # --- TACTICAL RESILIENCY LOOP (Handling 503 Overloads) ---
+            for attempt in range(max_retries):
+                try:
+                    # Attempt generation with primary core model
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=formatted_contents,
+                        config=config
+                    )
+                    break  # Request succeeded, exit retry block!
+                    
+                except APIError as e:
+                    # Catch 503 Server Overload or 429 Rate Limits
+                    if e.code == 503 and attempt < max_retries - 1:
+                        st.sidebar.warning(f"⚠️ Mainframe spike detected. Rerouting subroutines (Attempt {attempt+1}/{max_retries})...")
+                        time.sleep(initial_delay * (2 ** attempt))  # Exponential backoff sequence: 2s -> 4s -> 8s
+                    elif attempt == max_retries - 1:
+                        # Fallback attempt using alternate stable Pro architecture if Flash is buried
+                        try:
+                            st.sidebar.info("🔄 Initiating emergency fallback core (Pro)...")
+                            response = client.models.generate_content(
+                                model='gemini-2.5-pro',
+                                contents=formatted_contents,
+                                config=config
+                            )
+                            break
+                        except Exception as fallback_err:
+                            st.error(f"Mainframe Core Disruption: Server overload persistent. Please try again in a few moments. Internal diagnostic data: {str(fallback_err)}")
+                            st.stop()
+                    else:
+                        st.error(f"Mainframe Link Failure: Code {e.code} - {e.message}")
+                        st.stop()
+                except Exception as general_err:
+                    st.error(f"Unexpected Runtime Interruption: {str(general_err)}")
+                    st.stop()
+
+            # --- PROCESS AND OUTPUT RESPONSE ASSETS ---
+            if response and response.function_calls:
+                for function_call in response.function_calls:
+                    if function_call.name == "create_local_file":
+                        # Decode structural parameters from model tool request
+                        args = function_call.args
+                        f_name = args.get("file_name")
+                        f_content = args.get("content")
+                        
+                        # Execute local tool file system call
+                        tool_result = create_local_file(file_name=f_name, content=f_content)
+                        st.sidebar.info(f"⚡ File Generated: {f_name}")
+                        
+                        # Inform J.A.R.V.I.S. the function executed successfully so he can report back to you
+                        follow_up_contents = formatted_contents + [
+                            f"SYSTEM NOTE: The 'create_local_file' function ran successfully for '{f_name}'."
+                        ]
+                        
+                        try:
                             final_response = client.models.generate_content(
                                 model='gemini-2.5-flash',
                                 contents=follow_up_contents,
                                 config=types.GenerateContentConfig(system_instruction=JARVIS_MASTER_PROMPT)
                             )
-                            
                             jarvis_output = final_response.text
-                            st.markdown(jarvis_output)
-                            
-                            if os.path.exists(f_name):
-                                with open(f_name, "r") as dl_file:
-                                    st.download_button(
-                                        label=f"📥 Download Generated Asset ({f_name})",
-                                        data=dl_file.read(),
-                                        file_name=f_name,
-                                        mime="text/plain"
-                                    )
-                                    
-                else:
-                    jarvis_output = response.text
-                    st.markdown(jarvis_output)
+                        except Exception:
+                            # Clean string catch fallback if follow-up call glitches
+                            jarvis_output = f"File sequence completed successfully, sir. '{f_name}' has been staged in app memory and is ready for download below."
+                        
+                        st.markdown(jarvis_output)
+                        
+                        # Provide clean, native browser download button matching the new tactical theme
+                        if os.path.exists(f_name):
+                            with open(f_name, "r", encoding="utf-8") as dl_file:
+                                st.download_button(
+                                    label=f"📥 Download Generated Asset ({f_name})",
+                                    data=dl_file.read(),
+                                    file_name=f_name,
+                                    mime="text/plain"
+                                )
+                                
+            elif response:
+                # Standard text-based dialogue path execution
+                jarvis_output = response.text
+                st.markdown(jarvis_output)
                 
+                # Append to current memory footprint state
                 st.session_state.messages.append({"role": "assistant", "content": jarvis_output})
-                
-            except Exception as e:
-                st.error(f"Mainframe Core Disruption: {str(e)}")
