@@ -186,9 +186,9 @@ if "chat_history" not in st.session_state:
         {"role": "model", "text": "A.I.M.E.C.H.A. framework fully initialized. Emotional and regulatory subroutines loaded. Awaiting your instructions, sir."}
     ]
 
-# Explicit production directory routing names for the 1.5 architecture
-PRIMARY_MODEL = "models/gemini-1.5-flash"
-BACKUP_MODEL = "models/gemini-1.5-pro"
+# !!! SDK FIX: Removed the "models/" prefix string conflict !!!
+PRIMARY_MODEL = "gemini-2.5-flash"
+BACKUP_MODEL = "gemini-2.5-pro"
 
 # Initialize or restore the true persistent back-end chat instance
 if "jarvis_session" not in st.session_state:
@@ -233,13 +233,13 @@ if user_input := st.chat_input("Input mainframe command..."):
 
     with st.chat_message("assistant"):
         with st.spinner("Processing tactical parameters..."):
-            
+
             response = None
             max_retries = 3
             initial_delay = 4  
             error_encountered = False
             error_message = ""
-            
+
             # --- TACTICAL RESILIENCY LAYER ---
             for attempt in range(max_retries):
                 try:
@@ -247,7 +247,7 @@ if user_input := st.chat_input("Input mainframe command..."):
                     response = st.session_state.jarvis_session.send_message(user_input)
                     error_encountered = False
                     break 
-                    
+
                 except APIError as e:
                     error_encountered = True
                     if (e.code == 503 or e.code == 429) and attempt < max_retries - 1:
@@ -289,7 +289,7 @@ Sir, the uplink arrays are currently experiencing severe bandwidth throttling or
 """
                 st.markdown(jarvis_output)
                 st.session_state.chat_history.append({"role": "model", "text": jarvis_output})
-            
+
             # --- RENDER EXECUTION RESULTS ---
             elif response:
                 # Handle tool executions automatically handled via the chat engine
@@ -299,10 +299,10 @@ Sir, the uplink arrays are currently experiencing severe bandwidth throttling or
                             args = function_call.args
                             f_name = args.get("file_name")
                             f_content = args.get("content")
-                            
+
                             tool_result = create_local_file(file_name=f_name, content=f_content)
                             st.sidebar.info(f"⚡ File Generated: {f_name}")
-                            
+
                             # Complete the execution loop with the backend session context
                             final_response = st.session_state.jarvis_session.send_message(
                                 f"SYSTEM NOTE: The 'create_local_file' function ran successfully for '{f_name}'."
@@ -310,7 +310,7 @@ Sir, the uplink arrays are currently experiencing severe bandwidth throttling or
                             jarvis_output = final_response.text
                             st.markdown(jarvis_output)
                             st.session_state.chat_history.append({"role": "model", "text": jarvis_output})
-                            
+
                             if os.path.exists(f_name):
                                 with open(f_name, "r", encoding="utf-8") as dl_file:
                                     st.download_button(
