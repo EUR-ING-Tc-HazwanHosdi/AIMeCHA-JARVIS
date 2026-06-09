@@ -7,59 +7,72 @@ from google.genai import types
 from google.genai.errors import APIError
 
 # ==========================================
-# PAGE CONFIGURATION & A.I.M.E.C.H.A. UI
+# PAGE CONFIGURATION & STARK INDUSTRIES UI
 # ==========================================
-st.set_page_config(page_title="J.A.R.V.I.S. | A.I.M.E.C.H.A.", page_icon="🤖", layout="wide")
+st.set_page_config(
+    page_title="J.A.R.V.I.S.", 
+    page_icon="🤖", 
+    layout="wide"
+)
 
+# Custom stylized interface representing a digital diagnostic hub
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
-    
-    .stApp { background-color: #050B14; color: #E2F1F8; font-family: 'Orbitron', sans-serif; }
-    
-    /* Header & Branding */
-    .main-header { display: flex; align-items: center; gap: 20px; border-bottom: 2px solid #00E5FF; padding-bottom: 10px; margin-bottom: 20px; }
-    h1 { color: #00E5FF !important; text-transform: uppercase; letter-spacing: 3px; font-weight: 700; }
-    
-    /* HUD Elements */
-    .stButton>button { background-color: #002B3D; color: #00E5FF; border: 1px solid #00E5FF; border-radius: 0; font-family: 'Orbitron'; }
+    .stApp { background-color: #050B14; color: #E2F1F8; }
+    h1, h2, h3 { color: #00E5FF !important; font-family: 'Courier New', monospace; font-weight: bold; }
+    .stButton>button { background-color: #002B3D; color: #00E5FF; border: 1px solid #00E5FF; }
     .stButton>button:hover { background-color: #00E5FF; color: #050B14; }
-    .stChatMessage { background-color: #0A192F; border-left: 4px solid #00E5FF; border-radius: 0; box-shadow: 2px 2px 10px rgba(0, 229, 255, 0.1); }
-    .stSidebar { background-color: #050B14; border-right: 1px solid #005B7F; }
+    div[data-testid="stExpander"] { background-color: #0A1424; border: 1px solid #005B7F; }
+    .stChatMessage { background-color: #0A192F; border-radius: 6px; border-left: 3px solid #00E5FF; margin-bottom: 12px; }
     </style>
 """, unsafe_allow_html=True)
 
-# Header Section
-col1, col2 = st.columns([1, 6])
-with col1:
-    if os.path.exists("aimecha_logo.png"):
-        st.image("aimecha_logo.png", width=100)
-with col2:
-    st.markdown("<div class='main-header'><h1>A.I.M.E.C.H.A. | J.A.R.V.I.S.</h1></div>", unsafe_allow_html=True)
-
-# Sidebar HUD
-st.sidebar.title("⚙️ SYSTEM TELEMETRY")
-# ... (Keep your existing Key Pool Logic here) ...
+st.title("🤖 J.A.R.V.I.S. AI Engine")
+st.sidebar.title("⚙️ System Status")
+st.sidebar.success("Cognitive Core: ONLINE")
+st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
 
 # ==========================================
-# ... [KEEP YOUR EXISTING LOGIC FROM HERE DOWN] ...
+# MULTI-KEY POOL VERIFICATION & MANAGEMENT
 # ==========================================
+if "GEMINI_API_POOL" not in st.secrets:
+    st.sidebar.error("GEMINI_API_POOL missing from Secrets configuration.")
+    st.warning("Please pass your jarvis-1 to jarvis-5 array into the Streamlit Secret section box.")
+    st.stop()
 
-# Example of how to add the progress bar telemetry to your existing sidebar logic:
-if "available_keys" in locals():
-    stability = (total_keys - dead_keys) / total_keys
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("CORE STABILITY")
-    st.sidebar.progress(stability)
-    st.sidebar.caption(f"SYNC: MSIG V2026 | LATENCY: 14ms")
-    st.sidebar.caption("STATUS: ENCRYPTED / SECURE")
+# Track exhausted keys persistently across session states
+if "exhausted_keys" not in st.session_state:
+    st.session_state.exhausted_keys = set()
+
+api_key_pool = st.secrets["GEMINI_API_POOL"]
+available_keys = [k for k in api_key_pool if k not in st.session_state.exhausted_keys]
+
+# Display system status metrics in the sidebar
+total_keys = len(api_key_pool)
+dead_keys = len(st.session_state.exhausted_keys)
+active_index = dead_keys + 1
+
+if not available_keys:
+    st.sidebar.error("Engine status: ALL CORES EXHAUSTED")
+    st.error("🚨 CRITICAL METRIC EXHAUSTION: All 5 Jarvis core key tokens have been completely used up today.")
+    st.stop()
+else:
+    st.sidebar.warning(f"Engine Core: Jarvis [{active_index}/{total_keys}] Active")
+    st.sidebar.info(f"Runway: {total_keys - dead_keys} pristine fallback cores left.")
 
 # ==========================================
 # FEATURE 3: LOCAL TOOLS / FILE GENERATOR
 # ==========================================
 def create_local_file(file_name: str, content: str) -> str:
-    """ Generates and saves file in environment. """
+    """
+    Generates and saves any kind of file needed (CSV, Python scripts, Excel, CAD templates, markdown documentation).
+    
+    Args:
+        file_name: The complete output file name including extension (e.g., 'pump_efficiency.csv', 'analysis.py').
+        content: The raw string data or structural script data to write inside the file.
+    """
     try:
+        # Sanitize path to save in app memory
         safe_path = os.path.basename(file_name)
         with open(safe_path, "w", encoding="utf-8") as f:
             f.write(content)
@@ -69,8 +82,6 @@ def create_local_file(file_name: str, content: str) -> str:
 
 # Register the tool block inside Gemini's signature schema
 tools_list = [create_local_file]
-
-# ... [CONTINUE WITH YOUR REMAINING CODE BLOCK AS WRITTEN] ...
 
 # ==========================================
 # FEATURES 1, 2, & 4: COGNITIVE SYSTEM PROMPT
