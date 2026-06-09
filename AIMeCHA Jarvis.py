@@ -38,7 +38,7 @@ with header_col1:
     # Using the exact filename from your repository screenshot
     logo_path = "AIMeCHA Logo.png"
     if os.path.exists(logo_path):
-        st.image(logo_path, width=120)
+        st.image(logo_path, width=350)
     else:
         st.error("Logo file not found. Ensure 'AIMeCHA Logo.png' is in the root directory.")
 
