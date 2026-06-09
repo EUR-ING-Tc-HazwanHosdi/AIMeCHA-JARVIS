@@ -23,10 +23,33 @@ st.markdown("""
     .stButton>button:hover { background-color: #00E5FF; color: #050B14; }
     div[data-testid="stExpander"] { background-color: #0A1424; border: 1px solid #005B7F; }
     .stChatMessage { background-color: #0A192F; border-radius: 6px; border-left: 3px solid #00E5FF; margin-bottom: 12px; }
+    .logo-container { display: flex; align-items: center; gap: 20px; margin-bottom: 25px; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🤖 A.I.M.E.C.H.A. J.A.R.V.I.S. Core Operating System")
+# Helper function to convert local image to base64 for safe styling injection
+def get_base64_image(image_path):
+    if os.path.exists(image_path):
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    return None
+
+# Attempt to fetch your localized structural identity asset
+logo_base64 = get_base64_image("aimecha_logo.png")
+
+# Layout Render Sequence: Title with Logo fallback integration
+if logo_base64:
+    st.markdown(f"""
+        <div class="logo-container">
+            <img src="data:image/png;base64,{logo_base64}" width="80" style="filter: drop-shadow(0px 0px 8px #00E5FF); vertical-align: middle;">
+            <h1 style="display: inline; margin: 0; padding-left: 10px;">A.I.M.E.C.H.A. J.A.R.V.I.S. Core Operating System</h1>
+        </div>
+    """, unsafe_allow_html=True)
+else:
+    # Diagnostic fallback option if asset hasn't been mapped to the workspace directory yet
+    st.title("🤖 A.I.M.E.C.H.A. J.A.R.V.I.S. Core Operating System")
+    st.sidebar.warning("Branding Notice: Place 'aimecha_logo.png' in the root directory to active terminal HUD icon.")
+
 st.sidebar.title("⚙️ System Status")
 st.sidebar.success("Cognitive Core: ONLINE")
 st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
@@ -156,7 +179,7 @@ if user_input := st.chat_input("Input mainframe command..."):
                 # Setup configuration with System instructions and registered tools
                 config = types.GenerateContentConfig(
                     system_instruction=JARVIS_MASTER_PROMPT,
-                    temperature=0.4, # Kept crisp for technical precision
+                    temperature=0.4, 
                     tools=tools_list
                 )
                 
