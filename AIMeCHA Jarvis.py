@@ -10,7 +10,7 @@ from google.genai.errors import APIError
 # PAGE CONFIGURATION & STARK INDUSTRIES UI
 # ==========================================
 st.set_page_config(
-    page_title="A.I.M.E.C.H.A. J.A.R.V.I.S.", 
+    page_title="J.A.R.V.I.S.", 
     page_icon="🤖", 
     layout="wide"
 )
