@@ -33,32 +33,60 @@ st.sidebar.success("Cognitive Core: ONLINE")
 st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
 
 # ==========================================
-# MULTI-KEY POOL VERIFICATION & MANAGEMENT
+# SINGLE-KEY CONFIGURATION (FIXED)
 # ==========================================
-if "GEMINI_API_POOL" not in st.secrets:
-    st.sidebar.error("GEMINI_API_POOL missing from Secrets configuration.")
-    st.warning("Please pass your jarvis-1 to jarvis-5 array into the Streamlit Secret section box.")
+if "GEMINI_API_KEY" not in st.secrets:
+    st.sidebar.error("GEMINI_API_KEY missing from Secrets configuration.")
     st.stop()
 
-# Track exhausted keys persistently across session states
-if "exhausted_keys" not in st.session_state:
-    st.session_state.exhausted_keys = set()
+# Assigning the key to a variable
+api_key = st.secrets["GEMINI_API_KEY"]
 
-api_key_pool = st.secrets["GEMINI_API_KEY"]
-available_keys = [k for k in api_key_pool if k not in st.session_state.exhausted_keys]
+st.sidebar.success("Cognitive Core: ONLINE")
+st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
 
-# Display system status metrics in the sidebar
-total_keys = len(api_key_pool)
-dead_keys = len(st.session_state.exhausted_keys)
-active_index = dead_keys + 1
+# ... [Keep your create_local_file function here] ...
 
-if not available_keys:
-    st.sidebar.error("Engine status: ALL CORES EXHAUSTED")
-    st.error("🚨 CRITICAL METRIC EXHAUSTION: All 5 Jarvis core key tokens have been completely used up today.")
-    st.stop()
-else:
-    st.sidebar.warning(f"Engine Core: Jarvis [{active_index}/{total_keys}] Active")
-    st.sidebar.info(f"Runway: {total_keys - dead_keys} pristine fallback cores left.")
+# ==========================================
+# COMMAND INTERCEPT & EXECUTION (FIXED)
+# ==========================================
+if user_input := st.chat_input("Input mainframe command..."):
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Processing tactical parameters..."):
+            try:
+                # Use the 'api_key' defined in the sidebar section above
+                client = genai.Client(api_key=api_key)
+                
+                config = types.GenerateContentConfig(
+                    system_instruction=JARVIS_MASTER_PROMPT,
+                    temperature=0.4,
+                    tools=tools_list
+                )
+                
+                response = client.models.generate_content(
+                    model='gemini-2.0-flash',
+                    contents=[msg["content"] for msg in st.session_state.messages],
+                    config=config
+                )
+
+                # Tool handling
+                if response.function_calls:
+                    for function_call in response.function_calls:
+                        if function_call.name == "create_local_file":
+                            args = function_call.args
+                            tool_result = create_local_file(args.get("file_name"), args.get("content"))
+                            st.markdown(f"**{tool_result}**")
+                            st.session_state.messages.append({"role": "assistant", "content": tool_result})
+                else:
+                    st.markdown(response.text)
+                    st.session_state.messages.append({"role": "assistant", "content": response.text})
+            
+            except Exception as e:
+                st.error(f"Mainframe Core Disruption: {str(e)}")
 
 # ==========================================
 # FEATURE 3: LOCAL TOOLS / FILE GENERATOR
