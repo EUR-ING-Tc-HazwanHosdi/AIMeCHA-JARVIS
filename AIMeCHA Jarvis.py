@@ -33,13 +33,14 @@ st.sidebar.success("Cognitive Core: ONLINE")
 st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
 
 # ==========================================
-# SINGLE-KEY CONFIGURATION (FIXED)
+# SINGLE-KEY CONFIGURATION
 # ==========================================
+# Ensure you have GEMINI_API_KEY defined in your .streamlit/secrets.toml
 if "GEMINI_API_KEY" not in st.secrets:
     st.sidebar.error("GEMINI_API_KEY missing from Secrets configuration.")
     st.stop()
 
-# Assigning the key to a variable
+# Define the variable here
 api_key = st.secrets["GEMINI_API_KEY"]
 
 st.sidebar.success("Cognitive Core: ONLINE")
@@ -48,7 +49,7 @@ st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
 # ... [Keep your create_local_file function here] ...
 
 # ==========================================
-# COMMAND INTERCEPT & EXECUTION (FIXED)
+# COMMAND INTERCEPT & EXECUTION
 # ==========================================
 if user_input := st.chat_input("Input mainframe command..."):
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -58,7 +59,7 @@ if user_input := st.chat_input("Input mainframe command..."):
     with st.chat_message("assistant"):
         with st.spinner("Processing tactical parameters..."):
             try:
-                # Use the 'api_key' defined in the sidebar section above
+                # Now api_key is defined and ready for use
                 client = genai.Client(api_key=api_key)
                 
                 config = types.GenerateContentConfig(
@@ -68,12 +69,11 @@ if user_input := st.chat_input("Input mainframe command..."):
                 )
                 
                 response = client.models.generate_content(
-                    model='gemini-2.0-flash',
+                    model='gemini-2.0-flash', 
                     contents=[msg["content"] for msg in st.session_state.messages],
                     config=config
                 )
 
-                # Tool handling
                 if response.function_calls:
                     for function_call in response.function_calls:
                         if function_call.name == "create_local_file":
@@ -87,7 +87,6 @@ if user_input := st.chat_input("Input mainframe command..."):
             
             except Exception as e:
                 st.error(f"Mainframe Core Disruption: {str(e)}")
-
 # ==========================================
 # FEATURE 3: LOCAL TOOLS / FILE GENERATOR
 # ==========================================
