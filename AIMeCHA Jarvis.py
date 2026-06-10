@@ -198,7 +198,7 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # ==========================================
-# COMMAND INTERCEPT & AUTOMATED ROUTING LOOP
+# COMMAND INTERCEPT & ROUTING (OPENAI VERSION)
 # ==========================================
 if user_input := st.chat_input("Input mainframe command..."):
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -206,107 +206,43 @@ if user_input := st.chat_input("Input mainframe command..."):
         st.markdown(user_input)
 
     with st.chat_message("assistant"):
-        with st.spinner("Processing tactical parameters via available cores..."):
+        with st.spinner("Processing tactical parameters..."):
+            # Call OpenAI with tools
+            response = client.chat.completions.create(
+                model="gpt-4o", # Or gpt-4o-mini
+                messages=st.session_state.messages,
+                tools=[{
+                    "type": "function",
+                    "function": {
+                        "name": "create_local_file",
+                        "description": "Generate and save a file.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "file_name": {"type": "string"},
+                                "content": {"type": "string"}
+                            },
+                            "required": ["file_name", "content"]
+                        }
+                    }
+                }]
+            )
+
+            msg = response.choices[0].message
             
-            # Compile multi-turn raw chat strings
-            formatted_contents = [msg["content"] for msg in st.session_state.messages]
-            
-            # Re-verify remaining operational keys at the moment of request execution
-            available_keys = [k for k in st.secrets["GEMINI_API_KEY"] if k not in st.session_state.exhausted_keys]
-            
-            if not available_keys:
-                st.error("🚨 ALL CORES OFFLINE: System quota depleted. Please reload pool settings.")
-                st.stop()
-            
-            response = None
-            successful_key = None
-            
-            # AUTOMATIC RUNTIME OVERRIDE SEQUENCING
-            for active_key in available_keys:
-                try:
-                    # Form client handshake using the current targeted array string
-                    client = genai.Client(api_key=active_key)
-                    
-                    config = types.GenerateContentConfig(
-                        system_instruction=JARVIS_MASTER_PROMPT,
-                        temperature=0.4,
-                        tools=tools_list
-                    )
-                    
-                    # Execute generation call
-                    response = client.models.generate_content(
-                        model='gemini-2.5-flash-lite', 
-                        contents=formatted_contents,
-                        config=config
-                    )
-                    
-                    # If execution succeeds without triggering an error block, lock the key and break
-                    successful_key = active_key
-                    break
-                    
-                except Exception as e:
-                    error_str = str(e)
-                    # Catch structural resource limitations or HTTP 429 exceptions explicitly
-                    if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-                        st.session_state.exhausted_keys.add(active_key)
-                        st.sidebar.warning(f"Jarvis Core [{len(st.session_state.exhausted_keys)}] depleted. Switching link...")
-                        continue  # Let loop move to next available token block automatically
-                    else:
-                        # Drop general code bugs, missing libraries or config faults straight down
-                        st.error(f"Mainframe Core Disruption: {error_str}")
-                        st.stop()
-            
-            # Ensure a valid response object was returned before proceeding to extract metrics
-            if response:
-                jarvis_output = ""
+            if msg.tool_calls:
+                # Handle file generation
+                tool_call = msg.tool_calls[0]
+                args = json.loads(tool_call.function.arguments)
+                result = create_local_file(args['file_name'], args['content'])
+                st.sidebar.info(f"⚡ {result}")
+                st.markdown(f"**Task Executed:** {result}")
                 
-                # Check if the AI wants to execute a file creation tool
-                if response.function_calls:
-                    for function_call in response.function_calls:
-                        if function_call.name == "create_local_file":
-                            args = function_call.args
-                            f_name = args.get("file_name")
-                            f_content = args.get("content")
-                            
-                            # Execute the local tool execution script
-                            tool_result = create_local_file(file_name=f_name, content=f_content)
-                            st.sidebar.info(f"⚡ File Generated: {f_name}")
-                            
-                            # Notify the model using the same successful key channel to maintain state consistency
-                            follow_up_contents = formatted_contents + [
-                                f"SYSTEM NOTE: The 'create_local_file' function ran successfully for '{f_name}'."
-                            ]
-                            
-                            try:
-                                client = genai.Client(api_key=successful_key)
-                                final_response = client.models.generate_content(
-                                    model='gemini-2.5-flash-lite',
-                                    contents=follow_up_contents,
-                                    config=types.GenerateContentConfig(system_instruction=JARVIS_MASTER_PROMPT)
-                                )
-                                jarvis_output = final_response.text
-                            except Exception as follow_up_err:
-                                st.error(f"Follow-up Handshake Disruption: {str(follow_up_err)}")
-                                st.stop()
-                            
-                            st.markdown(jarvis_output)
-                            
-                            # Provide download utility
-                            if os.path.exists(f_name):
-                                with open(f_name, "r", encoding="utf-8") as dl_file:
-                                    st.download_button(
-                                        label=f"📥 Download Generated Asset ({f_name})",
-                                        data=dl_file.read(),
-                                        file_name=f_name,
-                                        mime="text/plain"
-                                    )
-                else:
-                    # Standard text response output pipeline
-                    jarvis_output = response.text
-                    st.markdown(jarvis_output)
-                
-                # Append finalized assistant payload onto historical thread tracker array
-                if jarvis_output:
-                    st.session_state.messages.append({"role": "assistant", "content": jarvis_output})
-                    # Force page state metrics refresh to accurately show updated key counts in sidebar
-                    st.rerun()
+                # Provide download button if the file exists
+                if os.path.exists(args['file_name']):
+                    with open(args['file_name'], "rb") as f:
+                        st.download_button("📥 Download Asset", f, file_name=args['file_name'])
+            else:
+                # Handle text response
+                st.markdown(msg.content)
+                st.session_state.messages.append({"role": "assistant", "content": msg.content})
