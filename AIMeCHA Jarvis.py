@@ -215,7 +215,7 @@ if user_input := st.chat_input("Input mainframe command..."):
             formatted_contents = [msg["content"] for msg in st.session_state.messages]
             
             # Re-verify remaining operational keys at the moment of request execution
-            available_keys = [k for k in st.secrets["GEMINI_API_POOL"] if k not in st.session_state.exhausted_keys]
+            available_keys = [k for k in st.secrets["GEMINI_API_KEY"] if k not in st.session_state.exhausted_keys]
             
             if not available_keys:
                 st.error("🚨 ALL CORES OFFLINE: System quota depleted. Please reload pool settings.")
