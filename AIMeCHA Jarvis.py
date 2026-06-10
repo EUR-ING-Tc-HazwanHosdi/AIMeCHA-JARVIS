@@ -97,7 +97,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 🛠️ FILE GENERATOR (REMAINED SAME)
+# 🛠️ FILE GENERATOR
 # ==========================================
 def create_local_file(file_name: str, content: str) -> str:
     try:
@@ -109,7 +109,7 @@ def create_local_file(file_name: str, content: str) -> str:
         return f"❌ ERROR: {str(e)}"
 
 # ==========================================
-# 🧠 MASTER PROMPT — MALAYSIA REGULATIONS + ENGINEERING
+# 🧠 MASTER PROMPT — UPDATED WITH YOUR MSIG DATA
 # ==========================================
 JARVIS_MASTER_PROMPT = """
 You are A.I.M.E.C.H.A. J.A.R.V.I.S., a sophisticated, hyper-intelligent, and emotionally supportive engineering mainframe. 
@@ -121,7 +121,29 @@ OPERATIONAL PROTOCOLS:
 3. MALAYSIA REGULATIONS: DOSH/JKKP, CIDB, MIDA, DOE, Suruhanjaya Tenaga, BEM, SPAN, IWK.
 4. MSIG SEWERAGE STANDARDS: Full knowledge of Volume 1–5, PE calculations, standards A/B, buffer zones, design parameters, testing.
 
+---
+📋 MSIG CHECKLIST — INDUSTRIAL SEWERAGE COMPLIANCE (MALAYSIA)
+Source: Garis Panduan Industri Pembetungan Malaysia (Jilid II) Edisi 2 - Pindaan V1 Julai 2013
+
+PROCEDURE STAGE | FORM CODE | APP CHARTER PERIOD | COMPLIANCE STATUS
+--- | --- | --- | ---
+2.1 Sewerage Planning | WSIA/PDC/1 | 14 Calendar Days | [ Not Started / In Progress / Completed ]
+2.2 System / Septic Tank Design | WSIA/PDC/2 | 21 Calendar Days | [ Not Started / In Progress / Completed ]
+2.3 Notice to Commence Works | WSIA/PDC/6 (3,4,5,6-1) | None (Submit Min 14 Days Before) | [ Not Started / In Progress / Completed ]
+2.4 Intermediate Inspection | WSIA/PDC/7 | 14 Calendar Days | [ Not Started / In Progress / Completed ]
+2.5 Final Inspection | WSIA/PDC/8 | 14 Calendar Days | [ Not Started / In Progress / Completed ]
+2.6 Septic Tank Completion Notice | WSIA/PDC/9 | 14 Calendar Days | [ Not Started / In Progress / Completed ]
+2.7 Public Sewerage System Handover | Handover Form + CCC | Subject to license holder | [ Not Started / In Progress / Completed ]
+
+✅ KEY COMPLIANCE NOTES (DEFECT LIABILITY PERIOD - DLP):
+1. Planning & Design approval is valid for **TWO (2) YEARS** from date of issue.
+2. Application for extension must be submitted **THREE (3) MONTHS** before expiry.
+3. Defect Liability Period (DLP) is **TWELVE (12) MONTHS** from official handover to authority.
+4. Bank Guarantee (BG) must be **FIVE PERCENT (5%)** of system cost and valid for **FIFTEEN (15) MONTHS**.
+---
+
 If user asks for file, output clearly with filename and content.
+Answer all questions based strictly on these standards and data.
 """
 
 # ==========================================
@@ -130,7 +152,7 @@ If user asks for file, output clearly with filename and content.
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "system", "content": JARVIS_MASTER_PROMPT},
-        {"role": "assistant", "content": "System online, sir. All engineering and regulatory databases loaded. Awaiting your command."}
+        {"role": "assistant", "content": "System online, sir. All engineering and regulatory databases — including full MSIG Sewerage Checklist & Standards — are loaded. Awaiting your command."}
     ]
 
 # ==========================================
@@ -158,8 +180,16 @@ st.sidebar.title("⚙️ SYSTEM STATUS")
 st.sidebar.markdown("<p class='status-online'>● COGNITIVE CORE: ONLINE</p>", unsafe_allow_html=True)
 st.sidebar.markdown("<p class='status-online'>● LOCAL AI: ACTIVE</p>", unsafe_allow_html=True)
 st.sidebar.markdown("<p class='status-warn'>● VOICE SYSTEM: DISABLED (TEXT MODE)</p>", unsafe_allow_html=True)
-st.sidebar.info("📂 GROUNDING: Malaysia Federal Regulatory Dataset V2026")
+st.sidebar.info("📂 GROUNDING: Malaysia Federal Regulatory Dataset V2026 + MSIG Standards")
 st.sidebar.info("📐 MODEL: Llama 3 | 8B | OFFLINE")
+
+# ✅ CLEAR CHAT BUTTON
+if st.sidebar.button("🗑️ CLEAR CHAT HISTORY"):
+    st.session_state.messages = [
+        {"role": "system", "content": JARVIS_MASTER_PROMPT},
+        {"role": "assistant", "content": "Chat cleared, sir. All systems ready. Awaiting new command."}
+    ]
+    st.rerun()
 
 # Show chat history
 for msg in st.session_state.messages:
@@ -167,7 +197,7 @@ for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-# Input area — ONLY TEXT (removed voice button)
+# Input area — ONLY TEXT
 user_input = st.chat_input("Enter command, sir...")
 
 # Process command
@@ -207,7 +237,7 @@ if user_input:
                     except:
                         pass
 
-                # No voice output — only text display
+                # Display response
                 st.markdown(jarvis_output)
                 st.session_state.messages.append({"role": "assistant", "content": jarvis_output})
 
