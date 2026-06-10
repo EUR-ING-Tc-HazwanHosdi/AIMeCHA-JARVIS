@@ -1,19 +1,17 @@
 import os
 import streamlit as st
 import ollama
-import pyttsx3
-import speech_recognition as sr
 
 # ==========================================
 # 🎨 IRON MAN NEON THEME + AIMeCHA LOGO
 # ==========================================
 st.set_page_config(
-    page_title="J.A.R.V.I.S. | STARK INDUSTRIES", 
+    page_title="J.A.R.V.I.S. | AIMeCHA Initiatives", 
     page_icon="🤖", 
     layout="wide"
 )
 
-# ✅ YOUR EXACT GITHUB LOGO LINK (from your screenshot)
+# ✅ YOUR EXACT GITHUB LOGO LINK
 AIMECHA_LOGO_URL = "https://raw.githubusercontent.com/EUR-ING-Tc-HazwanHosdi/AIMECHA-JARVIS/main/AIMeCHA%20Logo.png"
 
 st.markdown("""
@@ -99,40 +97,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 🎤 J.A.R.V.I.S. VOICE ENGINE — EXACT IRON MAN STYLE
-# ==========================================
-@st.cache_resource
-def init_jarvis_voice():
-    engine = pyttsx3.init()
-    voices = engine.getProperty('voices')
-    for voice in voices:
-        if "David" in voice.name or "British" in voice.name or "English (UK)" in voice.name:
-            engine.setProperty('voice', voice.id)
-            break
-    engine.setProperty('rate', 165)
-    engine.setProperty('volume', 0.9)
-    return engine
-
-jarvis_voice = init_jarvis_voice()
-
-def speak(text: str):
-    jarvis_voice.stop()
-    jarvis_voice.say(text)
-    jarvis_voice.runAndWait()
-
-def listen_to_user():
-    r = sr.Recognizer()
-    with sr.Microphone() as source:
-        st.info("🎤 Listening... Speak now, sir.")
-        r.adjust_for_ambient_noise(source, duration=0.5)
-        audio = r.listen(source)
-    try:
-        return r.recognize_google(audio)
-    except:
-        return "ERROR: Could not understand audio."
-
-# ==========================================
-# 🛠️ FILE GENERATOR
+# 🛠️ FILE GENERATOR (REMAINED SAME)
 # ==========================================
 def create_local_file(file_name: str, content: str) -> str:
     try:
@@ -180,7 +145,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 st.title("🤖 J.A.R.V.I.S. | STARK INDUSTRIES")
-st.markdown("<h4 style='color:#0099FF; text-shadow: 0 0 5px #0099FF;'>✅ LOCAL CORE ONLINE | ENGINEERING & REGULATORY MAINFRAME</h4>", unsafe_allow_html=True)
+st.markdown("<h4 style='color:#0099FF; text-shadow: 0 0 5px #0099FF;'>✅ LOCAL CORE ONLINE | ENGINEERING & REGULATORY MAINFRAME | TEXT ONLY</h4>", unsafe_allow_html=True)
 
 # 🖼️ SIDEBAR LOGO
 st.sidebar.markdown(f"""
@@ -192,7 +157,7 @@ st.sidebar.markdown(f"""
 st.sidebar.title("⚙️ SYSTEM STATUS")
 st.sidebar.markdown("<p class='status-online'>● COGNITIVE CORE: ONLINE</p>", unsafe_allow_html=True)
 st.sidebar.markdown("<p class='status-online'>● LOCAL AI: ACTIVE</p>", unsafe_allow_html=True)
-st.sidebar.markdown("<p class='status-online'>● VOICE SYSTEM: CALIBRATED</p>", unsafe_allow_html=True)
+st.sidebar.markdown("<p class='status-warn'>● VOICE SYSTEM: DISABLED (TEXT MODE)</p>", unsafe_allow_html=True)
 st.sidebar.info("📂 GROUNDING: Malaysia Federal Regulatory Dataset V2026")
 st.sidebar.info("📐 MODEL: Llama 3 | 8B | OFFLINE")
 
@@ -202,16 +167,8 @@ for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-# Input area
-col1, col2 = st.columns([4,1])
-with col1:
-    user_input = st.chat_input("Enter command, sir...")
-with col2:
-    if st.button("🎤 VOICE"):
-        voice_text = listen_to_user()
-        if voice_text and "ERROR" not in voice_text:
-            user_input = voice_text
-            st.info(f"🎙️ You said: {user_input}")
+# Input area — ONLY TEXT (removed voice button)
+user_input = st.chat_input("Enter command, sir...")
 
 # Process command
 if user_input:
@@ -250,12 +207,10 @@ if user_input:
                     except:
                         pass
 
-                # Speak response
-                speak(jarvis_output[:200])
+                # No voice output — only text display
                 st.markdown(jarvis_output)
                 st.session_state.messages.append({"role": "assistant", "content": jarvis_output})
 
             except Exception as e:
                 err = f"System fault, sir: {str(e)}"
                 st.error(err)
-                speak(err)
