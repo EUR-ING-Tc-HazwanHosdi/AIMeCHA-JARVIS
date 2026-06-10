@@ -1,20 +1,5 @@
-# Basic dependencies
-numpy==1.26.4          # exact version
-pandas>=2.2.0,<3.0.0   # version range
-requests~=2.31.0       # compatible release (2.31.x)
-flask                  # no version specified (latest)
-
-# With extra features
-requests[security]==2.31.0
-
-# Environment-specific
-pywin32; sys_platform == 'win32'
-psycopg2-binary; python_version >= "3.8"
-
-# Include another file
-# -r dev-requirements.txt
-
-# Install from URL/repo
-# git+https://github.com/psf/requests.git@v2.31.0#egg=requests
-
-# Comments start with #
+streamlit>=1.40.0
+ollama>=0.4.4
+pyttsx3>=2.90
+SpeechRecognition>=3.10.0
+pyaudio>=0.2.14
