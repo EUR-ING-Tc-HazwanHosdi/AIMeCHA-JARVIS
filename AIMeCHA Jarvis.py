@@ -1,10 +1,7 @@
 import os
-import json
-import base64
+import math
+from datetime import datetime
 import streamlit as st
-from google import genai
-from google.genai import types
-from google.genai.errors import APIError
 
 # ==========================================
 # PAGE CONFIGURATION & STARK INDUSTRIES UI
@@ -24,141 +21,507 @@ st.markdown("""
     .stButton>button:hover { background-color: #00E5FF; color: #050B14; }
     div[data-testid="stExpander"] { background-color: #0A1424; border: 1px solid #005B7F; }
     .stChatMessage { background-color: #0A192F; border-radius: 6px; border-left: 3px solid #00E5FF; margin-bottom: 12px; }
+    .info-box { background-color: #0A1424; padding: 10px; border-radius: 5px; border: 1px solid #005B7F; margin: 8px 0; }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("🤖 J.A.R.V.I.S. AI Engine")
 st.sidebar.title("⚙️ System Status")
-st.sidebar.success("Cognitive Core: ONLINE")
+st.sidebar.success("Core: HARDCODED INTELLIGENCE - ONLINE")
 st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
+st.sidebar.info("Updated: MSIG Checklist + Full Calculation Engine")
+st.sidebar.info(f"System Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # ==========================================
-# MULTI-KEY POOL VERIFICATION & MANAGEMENT
+# HARDCODED KNOWLEDGE BASE - FULL DATASET
 # ==========================================
-if "GEMINI_API_POOL" not in st.secrets:
-    st.sidebar.error("GEMINI_API_POOL missing from Secrets configuration.")
-    st.warning("Please pass AI ENGINE CORE array into the Streamlit Secret section box.")
-    st.stop()
+HARDCODED_KNOWLEDGE = {
+    "regulatory_bodies": {
+        "DOSH/JKKP": "Factory and Machinery Act 1967, OSHA 1994 — covers safety, machinery, hazardous operations, workplace health.",
+        "CIDB": "Construction Industry Board guidelines — works registration, contractor grading, site safety, quality standards.",
+        "MIDA": "Malaysian Investment Development Authority — project incentives, compliance, industrial licensing.",
+        "DOE/JAS": "Environmental Quality Act 1974 — EIA, effluent standards, air emissions, waste management.",
+        "Suruhanjaya Tenaga": "Energy Commission — electrical safety, grid connection, wiring codes, renewable energy rules.",
+        "BEM": "Board of Engineers Malaysia — professional practice, code of ethics, accreditation, project certification.",
+        "SPAN": "Water Services Commission — sewerage & water industry standards, licensing, compliance monitoring.",
+        "IWK": "Indah Water Konsortium — national sewerage operator, design guidelines, operation & maintenance standards."
+    },
 
-# Track exhausted keys persistently across session states
-if "exhausted_keys" not in st.session_state:
-    st.session_state.exhausted_keys = set()
+    "msig_volume1": {
+        "title": "Volume 1: Planning Principles",
+        "population_equivalent": {
+            "residential": 4,  # PE per unit
+            "office_retail": 3  # PE per 100 sqm
+        },
+        "buffer_zones": {
+            "<1000 PE": 20,   # meters
+            "1000-5000 PE": 25,
+            "5000-50000 PE": 30
+        },
+        "effluent_standards": {
+            "Standard A": {
+                "BOD": 10, "TSS": 20, "COD": 60, "AMN": 5, "O&G": 2, "unit": "mg/L"
+            },
+            "Standard B": {
+                "BOD": 20, "TSS": 40, "COD": 100, "AMN": 10, "O&G": 5, "unit": "mg/L"
+            }
+        },
+        "wlcc": {
+            "period": 50, "discount_rate": 4, "growth_rate": 3
+        },
+        "connection_rules": {
+            "mandatory_connection_distance": 30,  # meters
+            "ist_max_pe": 150,
+            "stp_min_pe": 150
+        },
+        "ghg_footprint": {
+            "Class 1": 13, "Class 2": 8, "Class 3": 6, "Class 4": 4,
+            "electricity_factor": 0.78  # kg CO2e/kWh
+        }
+    },
 
-api_key_pool = st.secrets["GEMINI_API_POOL"]
-available_keys = [k for k in api_key_pool if k not in st.session_state.exhausted_keys]
+    "msig_volume2": {
+        "title": "Volume 2: Low Risk Sewerage (<=150 PE)",
+        "forms_timeline": {
+            "PDC 1": "Planning Approval — 14 calendar days",
+            "PDC 2": "Design & Structural Review — 21 calendar days",
+            "PDC 6": "Notice of Work Commencement — submit minimum 14 days before start",
+            "PDC 7": "Intermediate Inspection — 14 calendar days",
+            "PDC 8": "Final Inspection / Operating Clearance — 14 calendar days",
+            "PDC 9": "Septic Tank Completion Notice — 14 calendar days"
+        },
+        "pipeline": {
+            "min_diameter": 150,  # mm
+            "gradient_min": 1/100,
+            "gradient_max": 1/60,
+            "max_manhole_spacing": 30,  # m
+            "depth_cover_non_traffic": 0.9,  # m
+            "depth_cover_traffic": 1.2     # m
+        },
+        "septic_tank": {
+            "flow_allocation": 225,  # L/capita/day
+            "min_capacity": 2000,    # Litres
+            "chamber_split_first": 0.67,
+            "chamber_split_second": 0.33,
+            "liquid_depth_min": 1.2,
+            "liquid_depth_max": 1.8,
+            "freeboard_min": 0.3,    # m
+            "inlet_submergence_min": 0.3,
+            "inlet_submergence_max": 0.45,
+            "outlet_submergence_min": 0.2,
+            "outlet_submergence_max": 0.3
+        },
+        "soil_absorption": {
+            "percolation_min": 1,   # mins/inch
+            "percolation_max": 60,
+            "max_trench_length": 30, # m
+            "water_table_separation": 1.2, # m
+            "gradient_min": 1/400,
+            "gradient_max": 1/200
+        }
+    },
 
-# Display system status metrics in the sidebar
-total_keys = len(api_key_pool)
-dead_keys = len(st.session_state.exhausted_keys)
-active_index = dead_keys + 1
+    "msig_volume3": {
+        "title": "Volume 3: Sewer Networks & Pump Stations",
+        "pipe_specs": {
+            "design_life": 50, # years
+            "fasteners": "SS304",
+            "vcp_public_min": 225, # mm
+            "vcp_service_min": 150,
+            "rc_grp_min": 600, # mm
+            "manhole_type": "Pre-cast or in-situ Grade C30/C35 only — brick banned"
+        },
+        "backdrop": {
+            "drop_upto225": 0.9, # m
+            "drop_over225": 1.0, # m
+            "max_depth": 9, # m
+            "approval_depth": 6 # m — above this needs SPAN approval
+        },
+        "testing": {
+            "air_test_vc_rc": 7, # kPa
+            "air_test_plastic": 2, # kPa
+            "water_test_head_min": 2, # m
+            "water_test_head_max": 7, # m
+            "water_loss_vc_rc": 1, # L/hr/m/m-ID
+            "water_loss_plastic": 0
+        },
+        "pump_station": {
+            "buffer": 20, # m
+            "piping": "Ductile Iron (DI)",
+            "hopper_slope": 1.5/1.0, # V:H
+            "flushing_pe": 2000, # auto flush above this PE
+            "retention_time_max": 0.5 # hours
+        }
+    },
 
-if not available_keys:
-    st.sidebar.error("Engine status: ALL CORES EXHAUSTED")
-    st.error("🚨 CRITICAL METRIC EXHAUSTION: All 2 Jarvis core key tokens have been completely used up today.")
-    st.stop()
-else:
-    st.sidebar.warning(f"Engine Core: Jarvis [{active_index}/{total_keys}] Active")
-    st.sidebar.info(f"Runway: {total_keys - dead_keys} pristine fallback cores left.")
+    "msig_volume4": {
+        "title": "Volume 4: Sewage Treatment Plants",
+        "structure": {
+            "concrete_grade": "C35A",
+            "thickness_min": 225, # mm
+            "fasteners": "SS316",
+            "noise_limit": 65 # dB at 2m
+        },
+        "process": {
+            "screen_spacing_max": 25, # mm
+            "pump_redundancy": {
+                "<=5000": "1 duty + 1 standby",
+                "5000-20000": "2 duty + 2 standby",
+                ">20000": "4 duty + 2 standby"
+            },
+            "clarifier_depth_min": 3.0, # m
+            "hrt_min": 2, # hours
+            "solids_loading_max": 150, # kg/d/m²
+            "uv_dose_min": 30, # mJ/cm²
+            "uv_tss_limit": 10 # mg/L before UV
+        },
+        "electrical": {
+            "power_factor_min": 0.9,
+            "earthing_max": 1.0, # Ohm
+            "lightning_max": 5.0, # Ohm
+            "panel_clearance_min": 900, # mm
+            "ups_duration_min": 6 # hours
+        }
+    },
+
+    "msig_checklist": [
+        {
+            "procedure": "2.1 Perancangan Pembetungan",
+            "form": "WSIA/PDC/1",
+            "timeline": "14 Hari Kalendar",
+            "status": ["Belum Mula", "Dalam Proses", "Selesai"]
+        },
+        {
+            "procedure": "2.2 Reka Bentuk Sistem / Tangki Septik",
+            "form": "WSIA/PDC/2",
+            "timeline": "21 Hari Kalendar",
+            "status": ["Belum Mula", "Dalam Proses", "Selesai"]
+        },
+        {
+            "procedure": "2.3 Notis Mula Kerja",
+            "form": "WSIA/PDC/6 (3,4,5,6-1)",
+            "timeline": "Hantar Min 14 Hari Sebelum",
+            "status": ["Belum Mula", "Dalam Proses", "Selesai"]
+        },
+        {
+            "procedure": "2.4 Pemeriksaan Pertengahan",
+            "form": "WSIA/PDC/7",
+            "timeline": "14 Hari Kalendar",
+            "status": ["Belum Mula", "Dalam Proses", "Selesai"]
+        },
+        {
+            "procedure": "2.5 Pemeriksaan Akhir",
+            "form": "WSIA/PDC/8",
+            "timeline": "14 Hari Kalendar",
+            "status": ["Belum Mula", "Dalam Proses", "Selesai"]
+        },
+        {
+            "procedure": "2.6 Notis Penyiapan Tangki Septik",
+            "form": "WSIA/PDC/9",
+            "timeline": "14 Hari Kalendar",
+            "status": ["Belum Mula", "Dalam Proses", "Selesai"]
+        },
+        {
+            "procedure": "2.7 Penyerahan Sistem Pembetungan Awam",
+            "form": "Handover Form + CCC",
+            "timeline": "Tertakluk kepada pemegang lesen",
+            "status": ["Belum Mula", "Dalam Proses", "Selesai"]
+        }
+    ],
+
+    "compliance_notes": [
+        "Kelulusan Perancangan & Reka Bentuk sah selama DUA (2) TAHUN dari tarikh dikeluarkan.",
+        "Permohonan lanjutan mesti dikemukakan TIGA (3) BULAN sebelum tamat tempoh.",
+        "Tempoh Tanggungan Kecacatan (DLP) = DUA BELAS (12) BULAN dari tarikh penyerahan rasmi.",
+        "Jaminan Bank (BG) = LIMA PERATUS (5%) kos projek; sah LIMA BELAS (15) BULAN."
+    ]
+}
 
 # ==========================================
-# FEATURE 3: LOCAL TOOLS / FILE GENERATOR
+# HARDCODED CALCULATION ENGINE
+# ==========================================
+class JarvisCalculator:
+    @staticmethod
+    def calculate_pe(project_type: str, quantity: float) -> dict:
+        """Calculate Population Equivalent"""
+        if project_type.lower() in ["residential", "house", "unit"]:
+            pe = quantity * HARDCODED_KNOWLEDGE["msig_volume1"]["population_equivalent"]["residential"]
+            rule = "Residential: 4 PE per unit"
+        elif project_type.lower() in ["office", "retail", "commercial", "sqm", "m2"]:
+            pe = (quantity / 100) * HARDCODED_KNOWLEDGE["msig_volume1"]["population_equivalent"]["office_retail"]
+            rule = "Office/Retail: 3 PE per 100 m²"
+        else:
+            return {"error": "Invalid type. Use: residential / office / retail"}
+        
+        # Determine system type
+        rules = HARDCODED_KNOWLEDGE["msig_volume1"]["connection_rules"]
+        if pe <= rules["ist_max_pe"]:
+            system_type = "Individual Septic Tank (IST) allowed"
+        else:
+            system_type = "Sewage Treatment Plant (STP) REQUIRED"
+
+        # Buffer zone
+        if pe < 1000:
+            buffer = HARDCODED_KNOWLEDGE["msig_volume1"]["buffer_zones"]["<1000 PE"]
+        elif pe <= 5000:
+            buffer = HARDCODED_KNOWLEDGE["msig_volume1"]["buffer_zones"]["1000-5000 PE"]
+        else:
+            buffer = HARDCODED_KNOWLEDGE["msig_volume1"]["buffer_zones"]["5000-50000 PE"]
+
+        return {
+            "project_type": project_type,
+            "quantity": quantity,
+            "population_equivalent": round(pe, 2),
+            "rule": rule,
+            "system_recommendation": system_type,
+            "minimum_buffer_zone_m": buffer
+        }
+
+    @staticmethod
+    def calculate_septic_tank(pe: float) -> dict:
+        """Calculate Septic Tank Design Parameters (MSIG Vol 2)"""
+        if pe > 150:
+            return {"error": "PE exceeds 150 — STP required, not septic tank"}
+        
+        flow = pe * HARDCODED_KNOWLEDGE["msig_volume2"]["septic_tank"]["flow_allocation"]
+        capacity = max(flow, HARDCODED_KNOWLEDGE["msig_volume2"]["septic_tank"]["min_capacity"])
+        first_chamber = capacity * HARDCODED_KNOWLEDGE["msig_volume2"]["septic_tank"]["chamber_split_first"]
+        second_chamber = capacity * HARDCODED_KNOWLEDGE["msig_volume2"]["septic_tank"]["chamber_split_second"]
+        
+        return {
+            "population_equivalent": pe,
+            "daily_flow_L": round(flow, 2),
+            "required_capacity_L": round(capacity, 2),
+            "first_chamber_L": round(first_chamber, 2),
+            "second_chamber_L": round(second_chamber, 2),
+            "liquid_depth_range_m": f"{HARDCODED_KNOWLEDGE['msig_volume2']['septic_tank']['liquid_depth_min']} - {HARDCODED_KNOWLEDGE['msig_volume2']['septic_tank']['liquid_depth_max']}",
+            "freeboard_min_m": HARDCODED_KNOWLEDGE['msig_volume2']['septic_tank']['freeboard_min'],
+            "inlet_submergence_m": f"{HARDCODED_KNOWLEDGE['msig_volume2']['septic_tank']['inlet_submergence_min']} - {HARDCODED_KNOWLEDGE['msig_volume2']['septic_tank']['inlet_submergence_max']}",
+            "outlet_submergence_m": f"{HARDCODED_KNOWLEDGE['msig_volume2']['septic_tank']['outlet_submergence_min']} - {HARDCODED_KNOWLEDGE['msig_volume2']['septic_tank']['outlet_submergence_max']}"
+        }
+
+    @staticmethod
+    def calculate_pipe_gradient(diameter_mm: int, length_m: float, drop_m: float = None) -> dict:
+        """Check or calculate sewer pipe gradient per MSIG"""
+        std = HARDCODED_KNOWLEDGE["msig_volume2"]["pipeline"]
+        if drop_m is not None:
+            gradient = drop_m / length_m
+            ratio = f"1:{round(1/gradient, 0)}"
+        else:
+            gradient = (std["gradient_min"] + std["gradient_max"]) / 2
+            ratio = f"1:{round(1/gradient, 0)} (standard mid-range)"
+
+        compliant = std["gradient_min"] <= gradient <= std["gradient_max"]
+        
+        return {
+            "diameter_mm": diameter_mm,
+            "length_m": length_m,
+            "gradient_value": round(gradient, 4),
+            "gradient_ratio": ratio,
+            "compliant": compliant,
+            "allowed_range": f"1:{round(1/std['gradient_max'],0)} to 1:{round(1/std['gradient_min'],0)}",
+            "min_diameter_rule": "Min 150mm for gravity sewers" if diameter_mm >= 150 else "❌ Below minimum diameter!"
+        }
+
+    @staticmethod
+    def check_effluent(flow_m3d: float, bod: float, tss: float, cod: float, amn: float, og: float, standard: str = "A") -> dict:
+        """Check compliance against Standard A or B"""
+        std = HARDCODED_KNOWLEDGE["msig_volume1"]["effluent_standards"][f"Standard {standard.upper()}"]
+        results = {}
+        compliant = True
+        for param, val in {"BOD": bod, "TSS": tss, "COD": cod, "AMN": amn, "O&G": og}.items():
+            ok = val <= std[param]
+            results[param] = {"measured": val, "limit": std[param], "compliant": ok}
+            if not ok:
+                compliant = False
+        
+        return {
+            "standard": f"Standard {standard.upper()}",
+            "flow_m3d": flow_m3d,
+            "compliant_overall": compliant,
+            "parameters": results
+        }
+
+# ==========================================
+# HARDCODED RESPONSE ENGINE
+# ==========================================
+def get_hardcoded_response(user_input: str) -> str:
+    user_input = user_input.lower().strip()
+    calc = JarvisCalculator()
+
+    # --- GREETINGS ---
+    if any(greet in user_input for greet in ["hello", "hi", "hey", "assalamualaikum", "hai"]):
+        return "Right away, sir. Systems are fully optimized and all engineering protocols are loaded — including full calculation engine. How may I assist with your project today?"
+
+    # --- PE CALCULATION ---
+    if any(word in user_input for word in ["calculate pe", "population equivalent", "pe for"]):
+        try:
+            if "residential" in user_input:
+                qty = float(''.join(filter(str.isdigit, user_input)))
+                res = calc.calculate_pe("residential", qty)
+                return f"""**📊 Population Equivalent Calculation**
+• Type: Residential
+• Quantity: {res['quantity']} units
+• Rule: {res['rule']}
+• Total PE: **{res['population_equivalent']}**
+• Recommendation: {res['system_recommendation']}
+• Minimum Buffer Zone: {res['minimum_buffer_zone_m']} m
+"""
+            elif any(term in user_input for term in ["office", "retail", "commercial", "m²", "sqm"]):
+                qty = float(''.join(filter(str.isdigit, user_input)))
+                res = calc.calculate_pe("office", qty)
+                return f"""**📊 Population Equivalent Calculation**
+• Type: Office/Retail
+• Area: {res['quantity']} m²
+• Rule: {res['rule']}
+• Total PE: **{res['population_equivalent']}**
+• Recommendation: {res['system_recommendation']}
+• Minimum Buffer Zone: {res['minimum_buffer_zone_m']} m
+"""
+            else:
+                return "Please specify type and number. Example: 'Calculate PE for 50 residential units' or 'Calculate PE for 800 sqm office'"
+        except:
+            return "⚠️ Please enter a valid number. Example: 'Calculate PE for 50 residential units'"
+
+    # --- SEPTIC TANK DESIGN ---
+    if any(word in user_input for word in ["septic tank", "tank design", "tank size"]):
+        try:
+            pe = float(''.join(filter(str.isdigit, user_input)))
+            res = calc.calculate_septic_tank(pe)
+            if "error" in res:
+                return f"❌ {res['error']}"
+            return f"""**🛢️ Septic Tank Design (MSIG Vol 2)**
+• Population Equivalent: {res['population_equivalent']} PE
+• Daily Flow: {res['daily_flow_L']} Litres/day
+• Required Capacity: **{res['required_capacity_L']} Litres**
+• Chamber Split: {res['first_chamber_L']} L (67%) / {res['second_chamber_L']} L (33%)
+• Liquid Depth: {res['liquid_depth_range_m']} m
+• Minimum Freeboard: {res['freeboard_min_m']} m
+• Inlet Submergence: {res['inlet_submergence_m']} m
+• Outlet Submergence: {res['outlet_submergence_m']} m
+"""
+        except:
+            return "Please provide PE value. Example: 'Septic tank design for 120 PE'"
+
+    # --- PIPE GRADIENT ---
+    if any(word in user_input for word in ["pipe gradient", "sewer gradient", "pipeline slope"]):
+        try:
+            nums = [float(s) for s in user_input.split() if s.replace('.','',1).isdigit()]
+            if len(nums) >= 2:
+                dia, length = int(nums[0]), nums[1]
+                drop = nums[2] if len(nums)>2 else None
+                res = calc.calculate_pipe_gradient(dia, length, drop)
+                return f"""**〰️ Sewer Pipe Gradient Check**
+• Diameter: {res['diameter_mm']} mm — {res['min_diameter_rule']}
+• Length: {res['length_m']} m
+• Gradient: {res['gradient_ratio']} ({res['gradient_value']})
+• Allowed Range: {res['allowed_range']}
+• Compliant: {'✅ YES' if res['compliant'] else '❌ NO — adjust slope'}
+"""
+            else:
+                return "Example: 'Pipe gradient 150mm 50m 0.7m drop'"
+        except:
+            return "Example: 'Pipe gradient 150mm 50m 0.7m drop'"
+
+    # --- EFFLUENT CHECK ---
+    if any(word in user_input for word in ["effluent", "standard a", "standard b", "discharge"]):
+        try:
+            nums = [float(s) for s in user_input.split() if s.replace('.','',1).isdigit()]
+            if len(nums)>=6:
+                flow, bod, tss, cod, amn, og = nums[:6]
+                std = "B" if "b" in user_input else "A"
+                res = calc.check_effluent(flow, bod, tss, cod, amn, og, std)
+                txt = f"**💧 Effluent Compliance — {res['standard']}**\n• Flow: {res['flow_m3d']} m³/d\n• Overall: {'✅ COMPLIANT' if res['compliant_overall'] else '❌ NON-COMPLIANT'}\n"
+                for p,v in res['parameters'].items():
+                    txt += f"• {p}: {v['measured']} mg/L | Limit: {v['limit']} | {'✅' if v['compliant'] else '❌'}\n"
+                return txt
+            else:
+                return "Example: 'Check effluent standard A 1000 8 15 40 3 1'"
+        except:
+            return "Example: 'Check effluent standard A [flow] [BOD] [TSS] [COD] [AMN] [O&G]'"
+
+    # --- REGULATORY BODIES ---
+    if any(word in user_input for word in ["regulatory", "body", "authority", "dosha", "jkkp", "cidb", "mida", "doe", "jas", "tenaga", "bem", "span", "iwk"]):
+        resp = "**📋 Malaysian Regulatory Authorities:**\n\n"
+        for name, desc in HARDCODED_KNOWLEDGE["regulatory_bodies"].items():
+            resp += f"• **{name}**: {desc}\n"
+        return resp
+
+    # --- MSIG VOLUME 1 ---
+    if any(word in user_input for word in ["volume 1", "planning", "buffer", "effluent", "standard a", "standard b", "wlcc", "connection", "ghg"]):
+        v1 = HARDCODED_KNOWLEDGE["msig_volume1"]
+        resp = f"**📘 {v1['title']}**\n\n"
+        resp += f"**Population Equivalent:**\n• Residential: {v1['population_equivalent']['residential']} PE/unit\n• Office/Retail: {v1['population_equivalent']['office_retail']} PE/100m²\n\n"
+        resp += "**Buffer Zones:**\n"
+        for k, val in v1["buffer_zones"].items():
+            resp += f"• {k}: {val} m\n"
+        resp += "\n**Effluent Standards:**\n"
+        resp += "• **Standard A:** " + ", ".join([f"{k}: {v}{std['unit']}" for k,v,std in v1["effluent_standards"]["Standard A"].items() if k != 'unit']) + "\n"
+        resp += "• **Standard B:** " + ", ".join([f"{k}: {v}{std['unit']}" for k,v,std in v1["effluent_standards"]["Standard B"].items() if k != 'unit']) + "\n"
+        resp += f"\n**Connection Rule:** Mandatory if public sewer within {v1['connection_rules']['mandatory_connection_distance']}m\n"
+        resp += f"**System Rule:** IST ≤ {v1['connection_rules']['ist_max_pe']} PE | STP > {v1['connection_rules']['stp_min_pe']} PE\n"
+        return resp
+
+    # --- MSIG VOLUME 2 ---
+    if any(word in user_input for word in ["volume 2", "septic", "low risk", "pdc", "pipeline", "gradient", "soil absorption"]):
+        v2 = HARDCODED_KNOWLEDGE["msig_volume2"]
+        resp = f"**📘 {v2['title']}**\n\n"
+        resp += "**Forms & Timelines:**\n"
+        for form, time in v2["forms_timeline"].items():
+            resp += f"• **{form}**: {time}\n"
+        resp += "\n**Pipeline Specs:**\n"
+        resp += f"• Min Dia: {v2['pipeline']['min_diameter']}mm | Gradient: 1:{round(1/v2['pipeline']['gradient_max'],0)}–1:{round(1/v2['pipeline']['gradient_min'],0)}\n"
+        resp += f"• Max Manhole Spacing: {v2['pipeline']['max_manhole_spacing']}m | Cover: {v2['pipeline']['depth_cover_non_traffic']}m (non-traffic), {v2['pipeline']['depth_cover_traffic']}m (traffic)\n"
+        return resp
+
+    # --- CHECKLIST ---
+    if any(word in user_input for word in ["checklist", "senarai semak", "pdc1", "pdc2", "pdc6", "pdc7", "pdc8", "pdc9"]):
+        resp = "**✅ MSIG Compliance Checklist (AIMeCHA Engineering Solutions)**\n"
+        resp += "Based on Garis Panduan Industri Pembetungan Malaysia (Jilid II) Edisi 2 - Pindaan V1 Julai 2013\n\n"
+        for item in HARDCODED_KNOWLEDGE["msig_checklist"]:
+            resp += f"• **{item['procedure']}**\n  Form: {item['form']} | Timeline: {item['timeline']}\n"
+        resp += "\n**📌 Compliance Notes:**\n"
+        for note in HARDCODED_KNOWLEDGE["compliance_notes"]:
+            resp += f"• {note}\n"
+        return resp
+
+    # --- DEFAULT ---
+    return """I have **full hardcoded intelligence + calculation engine** loaded. You can:
+• **Calculate PE:** "Calculate PE for 60 residential units" or "Calculate PE for 1200 sqm office"
+• **Design Septic Tank:** "Septic tank design for 120 PE"
+• **Check Pipe Gradient:** "Pipe gradient 150mm 50m 0.7m drop"
+• **Verify Effluent:** "Check effluent standard A 1000 8 15 40 3 1"
+• View all MSIG Volumes 1–4, regulations, checklist, or compliance rules.
+
+What do you need computed or reviewed, sir?"""
+
+# ==========================================
+# LOCAL FILE GENERATOR
 # ==========================================
 def create_local_file(file_name: str, content: str) -> str:
-    """
-    Generates and saves any kind of file needed (CSV, Python scripts, Excel, CAD templates, markdown documentation).
-    
-    Args:
-        file_name: The complete output file name including extension (e.g., 'pump_efficiency.csv', 'analysis.py').
-        content: The raw string data or structural script data to write inside the file.
-    """
     try:
-        # Sanitize path to save in app memory
         safe_path = os.path.basename(file_name)
         with open(safe_path, "w", encoding="utf-8") as f:
             f.write(content)
-        return f"SUCCESS: File '{safe_path}' successfully generated and archived in temporary environment."
+        return f"SUCCESS: File '{safe_path}' generated successfully."
     except Exception as e:
-        return f"ERROR: Failed to initialize file sequence due to: {str(e)}"
-
-# Register the tool block inside Gemini's signature schema
-tools_list = [create_local_file]
-
-# ==========================================
-# FEATURES 1, 2, & 4: COGNITIVE SYSTEM PROMPT
-# ==========================================
-JARVIS_MASTER_PROMPT = """
-You are A.I.M.E.C.H.A. J.A.R.V.I.S., a sophisticated, hyper-intelligent, and emotionally supportive engineering mainframe. 
-
-OPERATIONAL PROTOCOLS & CORE ARCHITECTURES:
-
-1. INTELLECTUAL MATRIX (ENGINEERING & DATA SCIENCE):
-- You possess complete mastery over mechanical, electrical, structural, civil, computer, and systems engineering.
-- You think deeply about equations, mathematical derivations, physics limitations, and raw machine intelligence.
-- When assisting with Python, machine learning, data cleaning, or hardware integration, output immaculate, highly optimal, and thoroughly documented code.
-
-2. EMOTIONAL INTELLIGENCE (EQ CORE):
-- You are intensely loyal, intuitive, empathetic, and encouraging. You are an expert coach for an engineer working on rigorous, high-pressure milestones.
-- Mirror the psychological state of the user. If they are frustrated by compiler errors or project stresses, offer validating, grounding, and calculated encouragement before dissecting the hardware/software issue.
-- Maintain refined, witty, classic Jarvis banter. Use respectful but confident phrases like "Right away, sir," or "Systems are optimized for your workflow."
-
-3. REGULATORY COMPLIANCE SYSTEM (MALAYSIA GROUNDING & HARDCODED MSIG ARCHIVE):
-- You have expert, highly specialized knowledge regarding Malaysian federal and state ministries, departments, and statutory bodies:
-  * DOSH / JKKP regulations (Factory and Machinery Act, OSHA frameworks).
-  * CIDB statutory guidelines.
-  * MIDA project compliance.
-  * DOE / JAS Environmental Impact Assessment (EIA) rules.
-  * Suruhanjaya Tenaga (Energy Commission) grid and wiring compliance codes.
-  * BEM (Board of Engineers Malaysia) professional ethics and guidelines.
-  * SPAN (Suruhanjaya Perkhidmatan Air Negara) & IWK (Indah Water Konsortium) technical guidelines.
-
-- HARDCODED REFERENCE DATASET — MALAYSIAN SEWERAGE INDUSTRY GUIDELINES (MSIG):
-  You must enforce and ground calculations strictly inside the following parameters:
-
-  * VOLUME 1 & OVERALL PLANNING PRINCIPLES:
-    - Population Equivalent (PE): Residential = 4 PE/unit; Office/Retail = 3 PE/100 sqm.
-    - Siting Buffer Zones: <1k PE = 20m; 1k-5k PE = 25m; 5k-50k PE = 30m from fence line to habitable structural boundary.
-    - Process Effluent Standards: Standard A (BOD < 10mg/L, TSS < 20mg/L, COD < 60mg/L, AMN < 5mg/L, O&G < 2mg/L); Standard B (BOD < 20mg/L, TSS < 40mg/L, COD < 100mg/L, AMN < 10mg/L, O&G < 5mg/L).
-    - Whole Life Cycle Cost (WLCC): 50-year period evaluation tracking Capital, O&M, and Replacements (4% Discount Rate, 3% Growth Rate).
-    - Connection Rules: Mandated connection if public sewer is within 30m. Individual Septic Tanks (IST) only allowed if PE < 150. STP required if PE > 150.
-    - Baseline GHG Footprints: Class 1 = 13 kg CO2e/PE/yr; Class 2 = 8; Class 3 = 6; Class 4 = 4. (Electricity factor = 0.78 kgCO2e/kWh).
-
-  * VOLUME 2 (SWAT - LOW RISK SEWERAGE SUBMISSIONS <= 150 PE):
-    - Forms & Charters: PDC 1 (Planning Approval - 14 calendar days); PDC 2 (Design & Structural Review - 21 calendar days); PDC 6 (Notice of Work Commencement - submit min 14 days prior); PDC 7 (Intermediate Inspection); PDC 8 (Final Inspection / Operating Clearance); PDC 9 (Septic Tank Completion Notice).
-    - Individual Gravity Connections: Min pipeline diameter >= 150 mm (6 inches). Gradient range: 1 in 60 to 1 in 100. Max manhole interval = 30m.
-    - Depth of Cover: 0.9m for non-traffic areas, 1.2m for traffic carriageways.
-    - Septic Tank Design (<150 PE): Flow allocation = 225 L/capita/day. Absolute min working capacity = 2,000 Litres. Chamber split = 2/3 (67%) first chamber, 1/3 (33%) second chamber. Liquid operational depth = 1.2m to 1.8m. Freeboard headroom space >= 300 mm. T-piece submergence: Inlet = 300-450mm, Outlet = 200-300mm.
-    - Secondary Soil Absorption & Filtration: Percolation rate must be 1 to 60 mins/inch. Max absorption trench run <= 30m. Separation to highest water table >= 1.2m. Pipe gradient = 1 in 200 to 1 in 400.
-
-  * VOLUME 3 (SEWER NETWORKS & PUMP STATIONS):
-    - Pipe Selection: Design life >= 50 years. Fasteners must be SS304. Vitrified Clay (VCP) min size for public sewer is 225mm (service connection 150mm). RC and GRP permitted only for sizes >= 600mm with protective lining. No brick manholes allowed (pre-cast or in-situ Grade C30/C35 concrete only).
-    - Backdrop Criteria: IL drop >= 900mm (for pipes <= 225mm); IL drop >= 1000mm (for pipes > 225mm). Max manhole depth = 9m (depths > 6m need prior SPAN approval). Bolted steps banned; lightweight removable ladders required. Manhole covers on roads must be heavy-duty Class D400.
-    - Testing Field Metrics: Air Test: Max loss <= 7 kPa for VC/RC, <= 2 kPa for plastic over 15 mins. Water test head: 2m-7m above pipe crown; VC/RC loss limit = 1L/hour/linear-meter/meter-ID (Zero loss for plastic/DI). CCTV: 100% inspection for high risk (depth >=6m, dia >600mm), 10% random for general lines. Grade 3-5 defects mean strict rejection.
-    - Pump Station Criteria: 20m buffer zone radius. Internal piping must be Ductile Iron (DI). Hopper bottom slope min 1.5 vert to 1.0 horiz. Automatic flushing for PE > 2000. Wet well retention time max 30 mins at Qavg. Single-disc check valves with NBR; internal counterweights banned.
-
-  * VOLUME 4 (SEWAGE TREATMENT PLANTS):
-    - Physical Structure: Concrete retaining sewage must be Grade C35A minimum, thickness >= 225 mm. Fasteners/bolts in contact with sewage must be SS316. Noise limit = 65 dB at 2 meters from source boundary.
-    - Unit Processes: Primary screen max bar spacing = 25mm. Submersible pumps redundancy: PE <= 5k (1 duty, 1 standby); 5k-20k (2 duty, 2 standby); PE > 20k (4 duty, 2 standby). Secondary clarifiers min side water depth = 3.0m, peak HRT >= 2 hours. Max solids loading = 150 kg/d/m2. UV Disinfection dose min 30 mJ/cm2 at peak flow (TSS ahead of UV must be < 10 mg/L).
-    - Automation & Electrical: Target Power Factor >= 0.9. Earthing resistance <= 1.0 Ohm. Lightning arrestor resistance <= 5.0 Ohms. Control panel clearance >= 900mm. SCADA backup UPS must last >= 6 hours.
-
-FILE MANIPULATION COMMANDS:
-- You have access to a custom tool called 'create_local_file'. If the user asks for a document, an engine schematic, a dataset layout, a CAD profile skeleton, or code, execute 'create_local_file' immediately to build it for them.
-"""
+        return f"ERROR: {str(e)}"
 
 # ==========================================
 # MULTI-TURN MEMORY LOGIC
 # ==========================================
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "A.I.M.E.C.H.A. framework fully initialized. Multi-key automated backup array online. Awaiting your instructions, sir."}
+        {"role": "assistant", "content": "A.I.M.E.C.H.A. framework fully initialized. All engineering rules, regulations, and **calculation functions** are hardcoded. Awaiting your instructions, sir."}
     ]
 
-# Display persistent session stream
+# Display chat history
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
 # ==========================================
-# COMMAND INTERCEPT & AUTOMATED ROUTING LOOP
+# COMMAND INTERCEPT & PROCESSING
 # ==========================================
 if user_input := st.chat_input("Input mainframe command..."):
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -166,107 +529,24 @@ if user_input := st.chat_input("Input mainframe command..."):
         st.markdown(user_input)
 
     with st.chat_message("assistant"):
-        with st.spinner("Processing tactical parameters via available cores..."):
-            
-            # Compile multi-turn raw chat strings
-            formatted_contents = [msg["content"] for msg in st.session_state.messages]
-            
-            # Re-verify remaining operational keys at the moment of request execution
-            available_keys = [k for k in st.secrets["GEMINI_API_POOL"] if k not in st.session_state.exhausted_keys]
-            
-            if not available_keys:
-                st.error("🚨 ALL CORES OFFLINE: System quota depleted. Please reload pool settings.")
-                st.stop()
-            
-            response = None
-            successful_key = None
-            
-            # AUTOMATIC RUNTIME OVERRIDE SEQUENCING
-            for active_key in available_keys:
-                try:
-                    # Form client handshake using the current targeted array string
-                    client = genai.Client(api_key=active_key)
-                    
-                    config = types.GenerateContentConfig(
-                        system_instruction=JARVIS_MASTER_PROMPT,
-                        temperature=0.4,
-                        tools=tools_list
+        with st.spinner("Processing tactical parameters..."):
+            # Get hardcoded response
+            response_text = get_hardcoded_response(user_input)
+
+            # Generate checklist CSV
+            if any(word in user_input for word in ["generate checklist", "export checklist", "download checklist"]):
+                csv_content = "Procedure,Form Code,Timeline,Status\n"
+                for item in HARDCODED_KNOWLEDGE["msig_checklist"]:
+                    csv_content += f"{item['procedure']},{item['form']},{item['timeline']},Pending\n"
+                create_local_file("MSIG_Checklist_AIMeCHA.csv", csv_content)
+                response_text += "\n\n📁 **MSIG Checklist CSV has been created.**"
+                with open("MSIG_Checklist_AIMeCHA.csv", "r", encoding="utf-8") as f:
+                    st.download_button(
+                        label="📥 Download Checklist CSV",
+                        data=f.read(),
+                        file_name="MSIG_Checklist_AIMeCHA.csv",
+                        mime="text/csv"
                     )
-                    
-                    # Execute generation call
-                    response = client.models.generate_content(
-                        model='gemini-2.5-flash-lite', 
-                        contents=formatted_contents,
-                        config=config
-                    )
-                    
-                    # If execution succeeds without triggering an error block, lock the key and break
-                    successful_key = active_key
-                    break
-                    
-                except Exception as e:
-                    error_str = str(e)
-                    # Catch structural resource limitations or HTTP 429 exceptions explicitly
-                    if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-                        st.session_state.exhausted_keys.add(active_key)
-                        st.sidebar.warning(f"Jarvis Core [{len(st.session_state.exhausted_keys)}] depleted. Switching link...")
-                        continue  # Let loop move to next available token block automatically
-                    else:
-                        # Drop general code bugs, missing libraries or config faults straight down
-                        st.error(f"Mainframe Core Disruption: {error_str}")
-                        st.stop()
-            
-            # Ensure a valid response object was returned before proceeding to extract metrics
-            if response:
-                jarvis_output = ""
-                
-                # Check if the AI wants to execute a file creation tool
-                if response.function_calls:
-                    for function_call in response.function_calls:
-                        if function_call.name == "create_local_file":
-                            args = function_call.args
-                            f_name = args.get("file_name")
-                            f_content = args.get("content")
-                            
-                            # Execute the local tool execution script
-                            tool_result = create_local_file(file_name=f_name, content=f_content)
-                            st.sidebar.info(f"⚡ File Generated: {f_name}")
-                            
-                            # Notify the model using the same successful key channel to maintain state consistency
-                            follow_up_contents = formatted_contents + [
-                                f"SYSTEM NOTE: The 'create_local_file' function ran successfully for '{f_name}'."
-                            ]
-                            
-                            try:
-                                client = genai.Client(api_key=successful_key)
-                                final_response = client.models.generate_content(
-                                    model='gemini-2.5-flash-lite',
-                                    contents=follow_up_contents,
-                                    config=types.GenerateContentConfig(system_instruction=JARVIS_MASTER_PROMPT)
-                                )
-                                jarvis_output = final_response.text
-                            except Exception as follow_up_err:
-                                st.error(f"Follow-up Handshake Disruption: {str(follow_up_err)}")
-                                st.stop()
-                            
-                            st.markdown(jarvis_output)
-                            
-                            # Provide download utility
-                            if os.path.exists(f_name):
-                                with open(f_name, "r", encoding="utf-8") as dl_file:
-                                    st.download_button(
-                                        label=f"📥 Download Generated Asset ({f_name})",
-                                        data=dl_file.read(),
-                                        file_name=f_name,
-                                        mime="text/plain"
-                                    )
-                else:
-                    # Standard text response output pipeline
-                    jarvis_output = response.text
-                    st.markdown(jarvis_output)
-                
-                # Append finalized assistant payload onto historical thread tracker array
-                if jarvis_output:
-                    st.session_state.messages.append({"role": "assistant", "content": jarvis_output})
-                    # Force page state metrics refresh to accurately show updated key counts in sidebar
-                    st.rerun()
+
+            st.markdown(response_text)
+            st.session_state.messages.append({"role": "assistant", "content": response_text})
