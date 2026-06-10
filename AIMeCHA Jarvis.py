@@ -2,103 +2,63 @@ import os
 import json
 import base64
 import streamlit as st
-from openai import OpenAI
+from google import genai
+from google.genai import types
+from google.genai.errors import APIError
 
 # ==========================================
-# PAGE CONFIGURATION & A.I.M.E.C.H.A. UI
+# PAGE CONFIGURATION & STARK INDUSTRIES UI
 # ==========================================
-st.set_page_config(page_title="J.A.R.V.I.S. | A.I.M.E.C.H.A.", page_icon="🤖", layout="wide")
+st.set_page_config(
+    page_title="J.A.R.V.I.S.", 
+    page_icon="🤖", 
+    layout="wide"
+)
 
+# Custom stylized interface representing a digital diagnostic hub
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
-    
-    .stApp { 
-        background-color: #050B14; 
-        color: #E2F1F8; 
-        font-family: 'Orbitron', sans-serif; 
-    }
-    
-    /* NEON GLOW EFFECTS */
-    .stApp {
-        background: radial-gradient(circle at center, #0B1E30 0%, #050B14 70%);
-    }
-
-    h1, h2, h3 { 
-        color: #00E5FF !important; 
-        text-transform: uppercase; 
-        letter-spacing: 4px; 
-        text-shadow: 0 0 10px #00E5FF, 0 0 20px #00E5FF;
-    }
-
-    /* ARC REACTOR HUD BUTTONS */
-    .stButton>button { 
-        background-color: #002B3D; 
-        color: #00E5FF; 
-        border: 2px solid #00E5FF; 
-        box-shadow: 0 0 10px #00E5FF;
-        transition: all 0.3s ease;
-    }
-    .stButton>button:hover { 
-        background-color: #00E5FF; 
-        color: #050B14; 
-        box-shadow: 0 0 30px #00E5FF;
-    }
-
-    /* CHAT BUBBLE GLOW */
-    .stChatMessage { 
-        background-color: #0A192F; 
-        border: 1px solid #005B7F;
-        box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);
-        border-left: 5px solid #00E5FF;
-    }
-
-    /* SIDEBAR HUD */
-    .stSidebar {
-        border-right: 2px solid #00E5FF;
-        box-shadow: 5px 0 15px rgba(0, 229, 255, 0.2);
-    }
+    .stApp { background-color: #050B14; color: #E2F1F8; }
+    h1, h2, h3 { color: #00E5FF !important; font-family: 'Courier New', monospace; font-weight: bold; }
+    .stButton>button { background-color: #002B3D; color: #00E5FF; border: 1px solid #00E5FF; }
+    .stButton>button:hover { background-color: #00E5FF; color: #050B14; }
+    div[data-testid="stExpander"] { background-color: #0A1424; border: 1px solid #005B7F; }
+    .stChatMessage { background-color: #0A192F; border-radius: 6px; border-left: 3px solid #00E5FF; margin-bottom: 12px; }
     </style>
 """, unsafe_allow_html=True)
 
-# ==========================================
-# HEADER WITH A.I.M.E.C.H.A. LOGO
-# ==========================================
-header_col1, header_col2 = st.columns([5, 12])
-
-with header_col1:
-    logo_path = "AIMeCHA Logo.png"
-    if os.path.exists(logo_path):
-        # Everything here must be indented 4 spaces relative to 'if'
-        st.markdown('<div class="logo-glow">', unsafe_allow_html=True)
-        st.image(logo_path, width=300)
-        st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        st.error("Logo file missing.")
-
-with header_col2:
-    st.markdown("<h1>🤖 J.A.R.V.I.S. AI Engine</h1>", unsafe_allow_html=True)
-    
+st.title("🤖 J.A.R.V.I.S. AI Engine")
 st.sidebar.title("⚙️ System Status")
 st.sidebar.success("Cognitive Core: ONLINE")
 st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
 
-
 # ==========================================
-# INITIALIZE OPENAI CLIENT
+# MULTI-KEY POOL VERIFICATION & MANAGEMENT
 # ==========================================
-if "OPENAI_API_KEY" not in st.secrets:
-    st.error("🚨 CRITICAL: OPENAI_API_KEY not found in system secrets.")
+if "GEMINI_API_POOL" not in st.secrets:
+    st.sidebar.error("GEMINI_API_POOL missing from Secrets configuration.")
+    st.warning("Please pass your jarvis-1 to jarvis-5 array into the Streamlit Secret section box.")
     st.stop()
 
-# Initialize OpenAI Client
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# Track exhausted keys persistently across session states
+if "exhausted_keys" not in st.session_state:
+    st.session_state.exhausted_keys = set()
 
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "system", "content": "You are A.I.M.E.C.H.A. J.A.R.V.I.S., a sophisticated engineering mainframe..."},
-        {"role": "assistant", "content": "A.I.M.E.C.H.A. framework online. Awaiting your instructions, sir."}
-    ]
+api_key_pool = st.secrets["GEMINI_API_KEY"]
+available_keys = [k for k in api_key_pool if k not in st.session_state.exhausted_keys]
+
+# Display system status metrics in the sidebar
+total_keys = len(api_key_pool)
+dead_keys = len(st.session_state.exhausted_keys)
+active_index = dead_keys + 1
+
+if not available_keys:
+    st.sidebar.error("Engine status: ALL CORES EXHAUSTED")
+    st.error("🚨 CRITICAL METRIC EXHAUSTION: All 5 Jarvis core key tokens have been completely used up today.")
+    st.stop()
+else:
+    st.sidebar.warning(f"Engine Core: Jarvis [{active_index}/{total_keys}] Active")
+    st.sidebar.info(f"Runway: {total_keys - dead_keys} pristine fallback cores left.")
 
 # ==========================================
 # FEATURE 3: LOCAL TOOLS / FILE GENERATOR
@@ -198,7 +158,7 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # ==========================================
-# COMMAND INTERCEPT & ROUTING (OPENAI VERSION)
+# COMMAND INTERCEPT & EXECUTION
 # ==========================================
 if user_input := st.chat_input("Input mainframe command..."):
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -207,42 +167,34 @@ if user_input := st.chat_input("Input mainframe command..."):
 
     with st.chat_message("assistant"):
         with st.spinner("Processing tactical parameters..."):
-            # Call OpenAI with tools
-            response = client.chat.completions.create(
-                model="gpt-4o", # Or gpt-4o-mini
-                messages=st.session_state.messages,
-                tools=[{
-                    "type": "function",
-                    "function": {
-                        "name": "create_local_file",
-                        "description": "Generate and save a file.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "file_name": {"type": "string"},
-                                "content": {"type": "string"}
-                            },
-                            "required": ["file_name", "content"]
-                        }
-                    }
-                }]
-            )
-
-            msg = response.choices[0].message
-            
-            if msg.tool_calls:
-                # Handle file generation
-                tool_call = msg.tool_calls[0]
-                args = json.loads(tool_call.function.arguments)
-                result = create_local_file(args['file_name'], args['content'])
-                st.sidebar.info(f"⚡ {result}")
-                st.markdown(f"**Task Executed:** {result}")
+            try:
+                # Initialize client with single key
+                client = genai.Client(api_key=api_key)
                 
-                # Provide download button if the file exists
-                if os.path.exists(args['file_name']):
-                    with open(args['file_name'], "rb") as f:
-                        st.download_button("📥 Download Asset", f, file_name=args['file_name'])
-            else:
-                # Handle text response
-                st.markdown(msg.content)
-                st.session_state.messages.append({"role": "assistant", "content": msg.content})
+                config = types.GenerateContentConfig(
+                    system_instruction=JARVIS_MASTER_PROMPT,
+                    temperature=0.4,
+                    tools=tools_list
+                )
+                
+                response = client.models.generate_content(
+                    model='gemini-2.0-flash', # Updated to latest stable model
+                    contents=[msg["content"] for msg in st.session_state.messages],
+                    config=config
+                )
+
+                # Tool handling (simplified)
+                if response.function_calls:
+                    for function_call in response.function_calls:
+                        if function_call.name == "create_local_file":
+                            args = function_call.args
+                            tool_result = create_local_file(args.get("file_name"), args.get("content"))
+                            st.markdown(f"**{tool_result}**")
+                            # Add tool output to history
+                            st.session_state.messages.append({"role": "assistant", "content": tool_result})
+                else:
+                    st.markdown(response.text)
+                    st.session_state.messages.append({"role": "assistant", "content": response.text})
+            
+            except Exception as e:
+                st.error(f"Mainframe Core Disruption: {str(e)}")
