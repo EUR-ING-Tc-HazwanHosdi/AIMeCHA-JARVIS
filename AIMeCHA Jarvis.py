@@ -119,7 +119,7 @@ OPERATIONAL PROTOCOLS:
 1. ENGINEERING: Master of mechanical, electrical, structural, civil, computer engineering. Output clean, documented code.
 2. EMOTIONAL: Loyal, encouraging, witty.
 3. MALAYSIA REGULATIONS: DOSH/JKKP, CIDB, MIDA, DOE, Suruhanjaya Tenaga, BEM, SPAN, IWK.
-4. MSIG SEWERAGE STANDARDS: Full knowledge of Volume 1–4, PE calculations, standards A/B, buffer zones, design parameters, testing.
+4. MSIG SEWERAGE STANDARDS: Full knowledge of Volume 1–5, PE calculations, standards A/B, buffer zones, design parameters, testing.
 
 If user asks for file, output clearly with filename and content.
 """
@@ -144,7 +144,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-st.title("🤖 J.A.R.V.I.S. | STARK INDUSTRIES")
+st.title("🤖 J.A.R.V.I.S. | AIMeCHA Initiatives")
 st.markdown("<h4 style='color:#0099FF; text-shadow: 0 0 5px #0099FF;'>✅ LOCAL CORE ONLINE | ENGINEERING & REGULATORY MAINFRAME | TEXT ONLY</h4>", unsafe_allow_html=True)
 
 # 🖼️ SIDEBAR LOGO
