@@ -2,9 +2,7 @@ import os
 import json
 import base64
 import streamlit as st
-from google import genai
-from google.genai import types
-from google.genai.errors import APIError
+from openai import OpenAI
 
 # ==========================================
 # PAGE CONFIGURATION & A.I.M.E.C.H.A. UI
@@ -85,23 +83,22 @@ st.sidebar.title("⚙️ System Status")
 st.sidebar.success("Cognitive Core: ONLINE")
 st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
 
+
 # ==========================================
-# SINGLE-KEY SYSTEM INITIALIZATION
+# INITIALIZE OPENAI CLIENT
 # ==========================================
-# Verify the key exists in secrets
-if "GEMINI_API_KEY" not in st.secrets:
-    st.sidebar.error("Mainframe Configuration Missing.")
-    st.error("🚨 CRITICAL: API_KEY not found in system secrets.")
+if "OPENAI_API_KEY" not in st.secrets:
+    st.error("🚨 CRITICAL: OPENAI_API_KEY not found in system secrets.")
     st.stop()
 
-# Load the single authorized key
-api_key = st.secrets["GEMINI_API_KEY"]
+# Initialize OpenAI Client
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# Sidebar HUD status
-st.sidebar.title("⚙️ System Status")
-st.sidebar.success("Cognitive Core: ONLINE")
-st.sidebar.info("Operational Status: Active | Authorized")
-st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "system", "content": "You are A.I.M.E.C.H.A. J.A.R.V.I.S., a sophisticated engineering mainframe..."},
+        {"role": "assistant", "content": "A.I.M.E.C.H.A. framework online. Awaiting your instructions, sir."}
+    ]
 
 # ==========================================
 # FEATURE 3: LOCAL TOOLS / FILE GENERATOR
