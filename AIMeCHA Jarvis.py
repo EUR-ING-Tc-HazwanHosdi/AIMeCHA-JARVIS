@@ -5,7 +5,7 @@ import pyttsx3
 import speech_recognition as sr
 
 # ==========================================
-# 🎨 IRON MAN NEON THEME + AIMeCHA LOGO (GITHUB PATH)
+# 🎨 IRON MAN NEON THEME + AIMeCHA LOGO
 # ==========================================
 st.set_page_config(
     page_title="J.A.R.V.I.S. | STARK INDUSTRIES", 
@@ -13,8 +13,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# ✅ YOUR EXACT GITHUB LOGO PATH (fixed space automatically)
-AIMECHA_LOGO_URL = "https://raw.githubusercontent.com/AdminAIMECHA/AIMECHA-JARVIS/main/AIMeCHA%20Logo.png"
+# ✅ YOUR EXACT GITHUB LOGO LINK (from your screenshot)
+AIMECHA_LOGO_URL = "https://raw.githubusercontent.com/EUR-ING-Tc-HazwanHosdi/AIMECHA-JARVIS/main/AIMeCHA%20Logo.png"
 
 st.markdown("""
     <style>
