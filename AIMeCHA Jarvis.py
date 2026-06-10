@@ -86,32 +86,22 @@ st.sidebar.success("Cognitive Core: ONLINE")
 st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
 
 # ==========================================
-# MULTI-KEY POOL VERIFICATION & MANAGEMENT
+# SINGLE-KEY SYSTEM INITIALIZATION
 # ==========================================
-if "GEMINI_API_POOL" not in st.secrets:
-    st.sidebar.error("GEMINI_API_POOL missing from Secrets configuration.")
-    st.warning("Please pass your jarvis-1 to jarvis-5 array into the Streamlit Secret section box.")
+# Verify the key exists in secrets
+if "GEMINI_API_KEY" not in st.secrets:
+    st.sidebar.error("Mainframe Configuration Missing.")
+    st.error("🚨 CRITICAL: API_KEY not found in system secrets.")
     st.stop()
 
-# Track exhausted keys persistently across session states
-if "exhausted_keys" not in st.session_state:
-    st.session_state.exhausted_keys = set()
+# Load the single authorized key
+api_key = st.secrets["GEMINI_API_KEY"]
 
-api_key_pool = st.secrets["GEMINI_API_POOL"]
-available_keys = [k for k in api_key_pool if k not in st.session_state.exhausted_keys]
-
-# Display system status metrics in the sidebar
-total_keys = len(api_key_pool)
-dead_keys = len(st.session_state.exhausted_keys)
-active_index = dead_keys + 1
-
-if not available_keys:
-    st.sidebar.error("Engine status: ALL CORES EXHAUSTED")
-    st.error("🚨 CRITICAL METRIC EXHAUSTION: All 5 Jarvis core key tokens have been completely used up today.")
-    st.stop()
-else:
-    st.sidebar.warning(f"Engine Core: Jarvis [{active_index}/{total_keys}] Active")
-    st.sidebar.info(f"Runway: {total_keys - dead_keys} pristine fallback cores left.")
+# Sidebar HUD status
+st.sidebar.title("⚙️ System Status")
+st.sidebar.success("Cognitive Core: ONLINE")
+st.sidebar.info("Operational Status: Active | Authorized")
+st.sidebar.info("Grounding: Malaysia Federal Regulatory Dataset V2026")
 
 # ==========================================
 # FEATURE 3: LOCAL TOOLS / FILE GENERATOR
